@@ -5,7 +5,13 @@ import streamlit as st
 st.set_page_config(
     page_title="Excel Part Splitter", page_icon="📊", layout="centered"
 )
-
+# --- 1. INSERT THE MULTI-USER DICTIONARY HERE (Right after config) ---
+USERS = {
+    "admin": "steel2026",
+    "aditya": "vicky123",
+    "manager": "plant2026",
+    "supervisor": "fab789",
+}
 # Session state for login
 if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
@@ -16,10 +22,11 @@ if not st.session_state.logged_in:
   username = st.text_input("Username")
   password = st.text_input("Password", type="password")
 
-  if st.button("Login"):
-    # Simple credentials check (Change as needed)
-    if username == "admin" and password == "steel2027":
+ if st.button("Login"):
+    # Check if username exists in dictionary and password matches
+    if username in USERS and USERS[username] == password:
       st.session_state.logged_in = True
+      st.session_state.username = username
       st.rerun()
     else:
       st.error("Invalid username or password")
