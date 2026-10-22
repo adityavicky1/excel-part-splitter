@@ -4,7 +4,7 @@ from pypdf import PdfReader, PdfWriter
 import streamlit as st
 
 st.set_page_config(
-    page_title="AM/NS India - Utilities", page_icon="⚙️", layout="wide"
+    page_title="FABTECH India - Utilities", page_icon="⚙️", layout="wide"
 )
 
 USERS = {
@@ -68,7 +68,7 @@ if not st.session_state.logged_in:
   st.markdown(
       """
         <div style="text-align: center; margin-top: 20px;">
-            <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">AM/NS<br><span style="font-size: 20px;">INDIA</span></h1>
+            <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">FAB TECH<br><span style="font-size: 20px;">INDIA</span></h1>
         </div>
     """,
       unsafe_allow_html=True,
@@ -119,7 +119,7 @@ else:
   st.markdown(
       f"""
         <div class="top-navbar">
-            <span>AM/NS INDIA &nbsp;|&nbsp; Plant Utilities Dashboard</span>
+            <span>FAB TECH INDIA &nbsp;|&nbsp; Plant Utilities Dashboard</span>
             <span>User: {st.session_state.username}</span>
         </div>
     """,
