@@ -59,7 +59,7 @@ if not st.session_state.logged_in:
   st.markdown(
       """
         <div style="text-align: center; margin-top: 20px;">
-            <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">AM/NS<br><span style="font-size: 20px;">INDIA</span></h1>
+            <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">FAB TECH<br><span style="font-size: 20px;">INDIA</span></h1>
         </div>
     """,
       unsafe_allow_html=True,
