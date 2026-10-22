@@ -15,7 +15,7 @@ USERS = {
 if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
 
-# Custom CSS for corporate header bar, sidebars, and clean layout
+# Custom CSS for top navbar, custom sidebar styling, and clean active states
 st.markdown(
     """
     <style>
@@ -47,6 +47,15 @@ st.markdown(
         font-size: 18px;
         border-bottom: 1px solid #e0e0e0;
         color: #333333;
+    }
+    /* Style Streamlit radio buttons in sidebar to match clean list look */
+    [data-testid="stSidebar"] .row-widget.stRadio div[role="radiogroup"] {
+        gap: 0px;
+    }
+    [data-testid="stSidebar"] .row-widget.stRadio label {
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-bottom: 2px;
     }
     </style>
     """,
@@ -117,17 +126,32 @@ else:
       unsafe_allow_html=True,
   )
 
-  # Sidebar Navigation Menu (Like your reference image)
-  st.sidebar.title("Utilities Menu")
+  # Sidebar Menu styled with section header like your reference image
+  st.sidebar.markdown(
+      '<h2 style="font-size: 22px; color: #111; margin-bottom: 10px;">PDF'
+      " Application</h2>",
+      unsafe_allow_html=True,
+  )
+
   selected_page = st.sidebar.radio(
-      "Select Tool",
+      "Navigation",
       [
-          "Excel Part Splitter",
-          "Merge PDF (Placeholder)",
-          "Rearrange PDF (Placeholder)",
-          "Compress Utility (Placeholder)",
-          "Apply OCR (Placeholder)",
+          "Merge PDF",
+          "Rearrange PDF",
+          "Image to PDF",
+          "Resize PDF",
+          "Remove PDF Pages",
+          "PDF to Text - Machine generated",
+          "PDF to Text - Scanned",
+          "Annotate/Redact PDF",
+          "Compress - Machine generated",
+          "Compress - Scanned",
+          "Rotate PDF",
+          "Bookmark PDF",
+          "Apply OCR",
+          "Excel Part Splitter",  # Added your excel automation tool here too
       ],
+      label_visibility="collapsed",
   )
 
   st.sidebar.markdown("---")
@@ -135,7 +159,7 @@ else:
     st.session_state.logged_in = False
     st.rerun()
 
-  # --- PAGE 1: EXCEL PART SPLITTER ---
+  # --- PAGE: EXCEL PART SPLITTER ---
   if selected_page == "Excel Part Splitter":
     st.title("⚙️ Excel Part Splitter Automation")
     st.write(
@@ -193,26 +217,9 @@ else:
       except Exception as e:
         st.error(f"Error processing file: {e}")
 
-  # --- PAGE 2: MERGE PDF (PLACEHOLDER) ---
-  elif selected_page == "Merge PDF (Placeholder)":
-    st.title("📄 Merge PDF")
-    st.write(
-        "Select and upload multiple PDF files to combine them into a single"
-        " document."
-    )
-    st.file_uploader("Choose PDF files", type=["pdf"], accept_multiple_files=True)
-    st.button("Merge PDFs", type="primary")
-
-  # --- PAGE 3: REARRANGE PDF (PLACEHOLDER) ---
-  elif selected_page == "Rearrange PDF (Placeholder)":
-    st.title("📑 Rearrange PDF Pages")
-    st.write("Upload a PDF to reorder or shuffle individual page sequences.")
-    st.file_uploader("Choose a PDF file", type=["pdf"])
-
-  # --- OTHER PAGES PLACEHOLDERS ---
+  # --- OTHER PAGES (PLACEHOLDERS) ---
   else:
-    st.title(f"🛠️ {selected_page}")
-    st.write(
-        "This tool module is currently being configured. You can add your"
-        " custom form logic here!"
-    )
+    st.title(f"📄 {selected_page}")
+    st.write(f"Workspace for **{selected_page}** utility form.")
+    st.file_uploader("Upload document for processing", type=["pdf"])
+    st.button(f"Process {selected_page}", type="primary")
