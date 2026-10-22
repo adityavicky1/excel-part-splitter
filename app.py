@@ -136,6 +136,7 @@ else:
   selected_page = st.sidebar.radio(
       "Navigation",
       [
+          "Excel Part Splitter"
           "Merge PDF",
           "Rearrange PDF",
           "Image to PDF",
@@ -149,7 +150,6 @@ else:
           "Rotate PDF",
           "Bookmark PDF",
           "Apply OCR",
-          "Excel Part Splitter",  # Added your excel automation tool here too
       ],
       label_visibility="collapsed",
   )
