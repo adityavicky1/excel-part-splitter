@@ -1,5 +1,6 @@
 import io
 import pandas as pd
+from pypdf import PdfReader, PdfWriter
 import streamlit as st
 
 st.set_page_config(
@@ -15,7 +16,7 @@ USERS = {
 if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
 
-# Custom CSS for top navbar, custom sidebar styling, and clean active states
+# Custom CSS for styling cards, top navbar, and sidebar
 st.markdown(
     """
     <style>
@@ -48,14 +49,14 @@ st.markdown(
         border-bottom: 1px solid #e0e0e0;
         color: #333333;
     }
-    /* Style Streamlit radio buttons in sidebar to match clean list look */
-    [data-testid="stSidebar"] .row-widget.stRadio div[role="radiogroup"] {
-        gap: 0px;
-    }
-    [data-testid="stSidebar"] .row-widget.stRadio label {
-        padding: 10px 15px;
-        border-radius: 4px;
-        margin-bottom: 2px;
+    .pdf-card {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        margin-bottom: 15px;
     }
     </style>
     """,
@@ -115,7 +116,6 @@ if not st.session_state.logged_in:
 
 # --- MAIN DASHBOARD (AFTER LOGIN) ---
 else:
-  # Top Header Bar matching your layout
   st.markdown(
       f"""
         <div class="top-navbar">
@@ -126,7 +126,7 @@ else:
       unsafe_allow_html=True,
   )
 
-  # Sidebar Menu styled with section header like your reference image
+  # Sidebar Menu matching your reference layout
   st.sidebar.markdown(
       '<h2 style="font-size: 22px; color: #111; margin-bottom: 10px;">PDF'
       " Application</h2>",
@@ -136,7 +136,7 @@ else:
   selected_page = st.sidebar.radio(
       "Navigation",
       [
-          "Excel Part Splitter"
+          "Excel Part Splitter",
           "Merge PDF",
           "Rearrange PDF",
           "Image to PDF",
@@ -159,12 +159,86 @@ else:
     st.session_state.logged_in = False
     st.rerun()
 
-  # --- PAGE: EXCEL PART SPLITTER ---
-  if selected_page == "Excel Part Splitter":
+  # --- MERGE PDF PAGE ---
+  if selected_page == "Merge PDF":
+    st.markdown(
+        "<h2 style='text-align: center;'>Merge PDF</h2>", unsafe_allow_html=True
+    )
+
+    uploaded_files = st.file_uploader(
+        "Select PDFs", type=["pdf"], accept_multiple_files=True, key="merge_uploader"
+    )
+
+    if uploaded_files:
+      num_files = len(uploaded_files)
+      st.markdown(
+          f"<p style='text-align: center; color: gray;'>{num_files} file(s)"
+          " selected</p>",
+          unsafe_allow_html=True,
+      )
+
+      # Sort toggle option matching your UI design
+      if st.button("🔄 Sort A-Z"):
+        uploaded_files = sorted(uploaded_files, key=lambda x: x.name)
+
+      st.markdown("<br>", unsafe_allow_html=True)
+
+      # Display files in card layout columns
+      cols = st.columns(min(len(uploaded_files), 3))
+      for idx, file in enumerate(uploaded_files):
+        # Read page count securely using pypdf
+        try:
+          reader = PdfReader(file)
+          page_count = len(reader.pages)
+        except Exception:
+          page_count = "?"
+
+        with cols[idx % len(cols)]:
+          st.markdown(
+              f"""
+                    <div class="pdf-card">
+                        <p style="font-size: 40px; margin: 0;">📄</p>
+                        <p style="font-weight: bold; margin: 5px 0 0 0; color: #333;">{file.name}</p>
+                        <p style="font-size: 13px; color: gray; margin: 0;">({page_count} pages)</p>
+                    </div>
+                    """,
+              unsafe_allow_html=True,
+          )
+
+      st.markdown("<br>", unsafe_allow_html=True)
+
+      # Merge Execution Logic
+      if st.button(
+          "Download Merged PDF", type="primary", use_container_width=True
+      ):
+        try:
+          merger = PdfWriter()
+          for file in uploaded_files:
+            file.seek(0)
+            merger.append(file)
+
+          output_buffer = io.BytesIO()
+          merger.write(output_buffer)
+          merger.close()
+          output_buffer.seek(0)
+
+          st.success("PDFs merged successfully!")
+          st.download_button(
+              label="📥 Click here to download your Merged PDF",
+              data=output_buffer,
+              file_name="merged_output.pdf",
+              mime="application/pdf",
+              use_container_width=True,
+          )
+        except Exception as e:
+          st.error(f"Error merging files: {e}")
+
+  # --- EXCEL PART SPLITTER PAGE ---
+  elif selected_page == "Excel Part Splitter":
     st.title("⚙️ Excel Part Splitter Automation")
     st.write(
         "Upload your layout spreadsheet containing **Mark no**, **Qty**, and"
-        " **Wt** columns to generate individual part serial numbers."
+        " **Wt** columns."
     )
 
     uploaded_file = st.file_uploader(
@@ -217,7 +291,7 @@ else:
       except Exception as e:
         st.error(f"Error processing file: {e}")
 
-  # --- OTHER PAGES (PLACEHOLDERS) ---
+  # --- OTHER PLACEHOLDER PAGES ---
   else:
     st.title(f"📄 {selected_page}")
     st.write(f"Workspace for **{selected_page}** utility form.")
