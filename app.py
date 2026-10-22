@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="AM/NS India - Utilities", page_icon="⚙️", layout="wide"
+    page_title="Fabrication India - Utilities", page_icon="⚙️", layout="wide"
 )
 
 USERS = {
@@ -106,7 +106,7 @@ if not st.session_state.logged_in:
           st.error("Invalid username or password")
 
   st.markdown(
-      '<div class="footer">Developed and managed by AM/NS IT team</div>',
+      '<div class="footer">Developed and managed by TEAM IT</div>',
       unsafe_allow_html=True,
   )
 
