@@ -56,7 +56,8 @@ else:
           mark_no = row["mark no"]
           total_qty = int(row["qty"])
           total_wt = row["wt"]
-          part_wt = total_wt / total_qty if total_qty > 0 else 0
+          # Calculate individual weight and round to 3 decimal places
+            part_wt = round(total_wt / total_qty, 3) if total_qty > 0 else 0
 
           for i in range(1, total_qty + 1):
             output_rows.append({
