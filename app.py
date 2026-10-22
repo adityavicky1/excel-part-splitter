@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Fabrication India - Utilities", page_icon="⚙️", layout="wide"
+    page_title="AM/NS India - Utilities", page_icon="⚙️", layout="wide"
 )
 
 USERS = {
@@ -15,12 +15,21 @@ USERS = {
 if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
 
-# Custom CSS for corporate styling, centered card, and footer
+# Custom CSS for corporate header bar, sidebars, and clean layout
 st.markdown(
     """
     <style>
-    .main {
-        background-color: #f4f2f2;
+    .top-navbar {
+        background-color: #e62117;
+        color: white;
+        padding: 10px 20px;
+        font-weight: bold;
+        font-size: 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-radius: 4px;
     }
     .login-container {
         max-width: 500px;
@@ -39,27 +48,17 @@ st.markdown(
         border-bottom: 1px solid #e0e0e0;
         color: #333333;
     }
-    .footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: #e62117;
-        color: white;
-        text-align: center;
-        padding: 10px;
-        font-size: 14px;
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+# --- LOGIN SCREEN ---
 if not st.session_state.logged_in:
   st.markdown(
       """
         <div style="text-align: center; margin-top: 20px;">
-            <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">FAB TECH<br><span style="font-size: 20px;">INDIA</span></h1>
+            <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">AM/NS<br><span style="font-size: 20px;">INDIA</span></h1>
         </div>
     """,
       unsafe_allow_html=True,
@@ -71,7 +70,7 @@ if not st.session_state.logged_in:
     st.markdown(
         """
         <div class="login-container">
-            <div class="login-header">Excel Utilities</div>
+            <div class="login-header">System Utilities Login</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -105,64 +104,115 @@ if not st.session_state.logged_in:
         else:
           st.error("Invalid username or password")
 
+# --- MAIN DASHBOARD (AFTER LOGIN) ---
+else:
+  # Top Header Bar matching your layout
   st.markdown(
-      '<div class="footer">Developed and managed by TEAM IT</div>',
+      f"""
+        <div class="top-navbar">
+            <span>AM/NS INDIA &nbsp;|&nbsp; Plant Utilities Dashboard</span>
+            <span>User: {st.session_state.username}</span>
+        </div>
+    """,
       unsafe_allow_html=True,
   )
 
-else:
-  st.title("⚙️ Excel Part Splitter Automation")
-  st.write(f"Welcome back, **{st.session_state.username}**!")
+  # Sidebar Navigation Menu (Like your reference image)
+  st.sidebar.title("Utilities Menu")
+  selected_page = st.sidebar.radio(
+      "Select Tool",
+      [
+          "Excel Part Splitter",
+          "Merge PDF (Placeholder)",
+          "Rearrange PDF (Placeholder)",
+          "Compress Utility (Placeholder)",
+          "Apply OCR (Placeholder)",
+      ],
+  )
 
-  if st.button("Logout"):
+  st.sidebar.markdown("---")
+  if st.sidebar.button("Logout", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-  uploaded_file = st.file_uploader(
-      "Choose an Excel file", type=["xlsx", "xls"]
-  )
+  # --- PAGE 1: EXCEL PART SPLITTER ---
+  if selected_page == "Excel Part Splitter":
+    st.title("⚙️ Excel Part Splitter Automation")
+    st.write(
+        "Upload your layout spreadsheet containing **Mark no**, **Qty**, and"
+        " **Wt** columns to generate individual part serial numbers."
+    )
 
-  if uploaded_file is not None:
-    try:
-      df = pd.read_excel(uploaded_file)
-      df.columns = df.columns.str.strip().str.lower()
+    uploaded_file = st.file_uploader(
+        "Choose an Excel file", type=["xlsx", "xls"]
+    )
 
-      if not {"mark no", "qty", "wt"}.issubset(df.columns):
-        st.error(
-            "Invalid columns! Expected 'Mark no', 'Qty', and 'Wt' in your file."
-        )
-      else:
-        output_rows = []
-        for _, row in df.iterrows():
-          mark_no = row["mark no"]
-          total_qty = int(row["qty"])
-          total_wt = row["wt"]
-          part_wt = round(total_wt / total_qty, 3) if total_qty > 0 else 0
+    if uploaded_file is not None:
+      try:
+        df = pd.read_excel(uploaded_file)
+        df.columns = df.columns.str.strip().str.lower()
 
-          for i in range(1, total_qty + 1):
-            output_rows.append({
-                "Mark No": mark_no,
-                "Part SlNo": f"{i}/{total_qty}",
-                "Qty": 1,
-                "Wt": part_wt,
-            })
+        if not {"mark no", "qty", "wt"}.issubset(df.columns):
+          st.error(
+              "Invalid columns! Expected 'Mark no', 'Qty', and 'Wt' in your"
+              " file."
+          )
+        else:
+          output_rows = []
+          for _, row in df.iterrows():
+            mark_no = row["mark no"]
+            total_qty = int(row["qty"])
+            total_wt = row["wt"]
+            part_wt = round(total_wt / total_qty, 3) if total_qty > 0 else 0
 
-        output_df = pd.DataFrame(output_rows)
-        st.success("File processed successfully!")
-        st.dataframe(output_df)
+            for i in range(1, total_qty + 1):
+              output_rows.append({
+                  "Mark No": mark_no,
+                  "Part SlNo": f"{i}/{total_qty}",
+                  "Qty": 1,
+                  "Wt": part_wt,
+              })
 
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-          output_df.to_excel(writer, index=False, sheet_name="Split_Parts")
-        output.seek(0)
+          output_df = pd.DataFrame(output_rows)
+          st.success("File processed successfully!")
+          st.dataframe(output_df)
 
-        st.download_button(
-            label="📥 Download Processed Excel",
-            data=output,
-            file_name="processed_parts_output.xlsx",
-            mime=(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            ),
-        )
-    except Exception as e:
-      st.error(f"Error processing file: {e}")
+          output = io.BytesIO()
+          with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            output_df.to_excel(writer, index=False, sheet_name="Split_Parts")
+          output.seek(0)
+
+          st.download_button(
+              label="📥 Download Processed Excel",
+              data=output,
+              file_name="processed_parts_output.xlsx",
+              mime=(
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              ),
+          )
+      except Exception as e:
+        st.error(f"Error processing file: {e}")
+
+  # --- PAGE 2: MERGE PDF (PLACEHOLDER) ---
+  elif selected_page == "Merge PDF (Placeholder)":
+    st.title("📄 Merge PDF")
+    st.write(
+        "Select and upload multiple PDF files to combine them into a single"
+        " document."
+    )
+    st.file_uploader("Choose PDF files", type=["pdf"], accept_multiple_files=True)
+    st.button("Merge PDFs", type="primary")
+
+  # --- PAGE 3: REARRANGE PDF (PLACEHOLDER) ---
+  elif selected_page == "Rearrange PDF (Placeholder)":
+    st.title("📑 Rearrange PDF Pages")
+    st.write("Upload a PDF to reorder or shuffle individual page sequences.")
+    st.file_uploader("Choose a PDF file", type=["pdf"])
+
+  # --- OTHER PAGES PLACEHOLDERS ---
+  else:
+    st.title(f"🛠️ {selected_page}")
+    st.write(
+        "This tool module is currently being configured. You can add your"
+        " custom form logic here!"
+    )
