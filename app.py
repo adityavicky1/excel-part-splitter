@@ -4,7 +4,7 @@ from pypdf import PdfReader, PdfWriter
 import streamlit as st
 
 st.set_page_config(
-    page_title="FABTECH India - Utilities", page_icon="⚙️", layout="wide"
+    page_title="FABTECH India", page_icon="⚙️", layout="wide"
 )
 
 USERS = {
@@ -126,7 +126,7 @@ else:
       unsafe_allow_html=True,
   )
 
-  # Sidebar Menu matching your reference layout
+  # Sidebar Menu
   st.sidebar.markdown(
       '<h2 style="font-size: 22px; color: #111; margin-bottom: 10px;">PDF'
       " Application</h2>",
@@ -167,16 +167,13 @@ else:
           unsafe_allow_html=True,
       )
 
-      # Sort toggle option matching your UI design
       if st.button("🔄 Sort A-Z"):
         uploaded_files = sorted(uploaded_files, key=lambda x: x.name)
 
       st.markdown("<br>", unsafe_allow_html=True)
 
-      # Display files in card layout columns
       cols = st.columns(min(len(uploaded_files), 3))
       for idx, file in enumerate(uploaded_files):
-        # Read page count securely using pypdf
         try:
           reader = PdfReader(file)
           page_count = len(reader.pages)
@@ -197,7 +194,6 @@ else:
 
       st.markdown("<br>", unsafe_allow_html=True)
 
-      # Merge Execution Logic
       if st.button(
           "Download Merged PDF", type="primary", use_container_width=True
       ):
@@ -228,8 +224,8 @@ else:
     st.title("⚙️ Excel Part Splitter Automation")
     st.write(
         "Upload your spreadsheet containing **Mark no**, **Qty**, and **Wt**"
-        " columns. Any additional columns (e.g., Drawing No, Area, rev No) will"
-        " be preserved automatically."
+        " columns. All additional columns (e.g., Drawing No, Area, rev No) are"
+        " preserved automatically."
     )
 
     uploaded_file = st.file_uploader(
@@ -240,18 +236,15 @@ else:
       try:
         df = pd.read_excel(uploaded_file)
 
-        # Create a lowercase mapping to find columns regardless of casing or extra spaces
         col_mapping = {col.strip().lower(): col for col in df.columns}
-
-        # Check for mandatory columns
         required_cols = {"mark no", "qty", "wt"}
+        
         if not required_cols.issubset(col_mapping.keys()):
           st.error(
               "Invalid columns! Your file must at least contain 'Mark no',"
               " 'Qty', and 'Wt'."
           )
         else:
-          # Get actual column names from the file
           mark_col = col_mapping["mark no"]
           qty_col = col_mapping["qty"]
           wt_col = col_mapping["wt"]
@@ -262,17 +255,14 @@ else:
             total_qty = int(row[qty_col])
             total_wt = row[wt_col]
 
-            # Calculate individual weight and round to 3 decimal places
             part_wt = round(total_wt / total_qty, 3) if total_qty > 0 else 0
 
-            # Copy all other column values from the original row
             other_columns_data = {
                 col: row[col]
                 for col in df.columns
                 if col not in [mark_col, qty_col, wt_col]
             }
 
-            # Generate individual part rows (1/N to N/N)
             for i in range(1, total_qty + 1):
               new_row = {
                   "Mark No": mark_no,
@@ -280,7 +270,6 @@ else:
                   "Qty": 1,
                   "Wt": part_wt,
               }
-              # Add all other preserved columns back into the row dictionary
               new_row.update(other_columns_data)
               output_rows.append(new_row)
 
@@ -288,12 +277,12 @@ else:
           st.success("File processed successfully with all columns preserved!")
           st.dataframe(output_df)
 
-          # Download button setup
           output = io.BytesIO()
           with pd.ExcelWriter(output, engine="openpyxl") as writer:
             output_df.to_excel(writer, index=False, sheet_name="Split_Parts")
-          output.seek(0)   
-            st.download_button(
+          output.seek(0)
+
+          st.download_button(
               label="📥 Download Processed Excel",
               data=output,
               file_name="processed_parts_output.xlsx",
