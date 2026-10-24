@@ -330,10 +330,10 @@ else:
 
           # Safe extraction for Grade (typically row 5/6) and Section (row 7/8)
           grade = (
-              cleaned_lines[5] if len(cleaned_lines) > 5 else "Unknown Grade"
+              cleaned_lines[4] if len(cleaned_lines) > 5 else "Unknown Grade"
           )
           section = (
-              cleaned_lines[7] if len(cleaned_lines) > 7 else "Unknown Section"
+              cleaned_lines[6] if len(cleaned_lines) > 7 else "Unknown Section"
           )
 
           parsed_data.append({
