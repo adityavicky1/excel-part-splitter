@@ -355,8 +355,8 @@ else:
           # [6]: PL10 (Section / Profile)
           
           if len(meaningful_lines) >= 7:
-            grade = meaningful_lines[4]
-            section = meaningful_lines[6]
+            grade = meaningful_lines[5]
+            section = meaningful_lines[7]
           elif len(cleaned_lines) > 7:
             # Fallback to absolute index if meaningful lines filter is too aggressive
             grade = cleaned_lines[5]
