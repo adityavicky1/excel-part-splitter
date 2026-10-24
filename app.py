@@ -1,11 +1,11 @@
 import io
+import os
+import zipfile
 import pandas as pd
 from pypdf import PdfReader, PdfWriter
 import streamlit as st
 
-st.set_page_config(
-    page_title="FABTECH India", page_icon="⚙️", layout="wide"
-)
+st.set_page_config(page_title="FABTECH India", page_icon="⚙️", layout="wide")
 
 USERS = {
     "admin": "steel2026",
@@ -128,8 +128,8 @@ else:
 
   # Sidebar Menu
   st.sidebar.markdown(
-      '<h2 style="font-size: 22px; color: #111; margin-bottom: 10px;">PDF'
-      " Application</h2>",
+      '<h2 style="font-size: 22px; color: #111; margin-bottom: 10px;">Plant'
+      " Utilities</h2>",
       unsafe_allow_html=True,
   )
 
@@ -138,7 +138,7 @@ else:
       [
           "Excel Part Splitter",
           "Merge PDF",
-          "Under Construction",
+          "NC File Sorter & Extractor",
           "Under Construction",
       ],
       label_visibility="collapsed",
@@ -156,7 +156,10 @@ else:
     )
 
     uploaded_files = st.file_uploader(
-        "Select PDFs", type=["pdf"], accept_multiple_files=True, key="merge_uploader"
+        "Select PDFs",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="merge_uploader",
     )
 
     if uploaded_files:
@@ -238,7 +241,7 @@ else:
 
         col_mapping = {col.strip().lower(): col for col in df.columns}
         required_cols = {"mark no", "qty", "wt"}
-        
+
         if not required_cols.issubset(col_mapping.keys()):
           st.error(
               "Invalid columns! Your file must at least contain 'Mark no',"
@@ -292,6 +295,107 @@ else:
           )
       except Exception as e:
         st.error(f"Error processing file: {e}")
+
+  # --- NC FILE SORTER & EXTRACTOR PAGE ---
+  elif selected_page == "NC File Sorter & Extractor":
+    st.title("📂 NC File Sorter & Extractor")
+    st.write(
+        "Upload your `.nc` or `.nc1` files to parse parameters (Grade & Section)"
+        " and organize them automatically into folders based on **MM Section** and"
+        " **Grade**."
+    )
+
+    nc_files = st.file_uploader(
+        "Select NC Files",
+        type=["nc", "nc1"],
+        accept_multiple_files=True,
+        key="nc_uploader",
+    )
+
+    if nc_files:
+      st.info(f"{len(nc_files)} NC file(s) uploaded successfully.")
+
+      parsed_data = []
+      file_contents_map = {}
+
+      for file in nc_files:
+        try:
+          file.seek(0)
+          content_bytes = file.read()
+          file_contents_map[file.name] = content_bytes
+          lines = content_bytes.decode("utf-8", errors="ignore").splitlines()
+
+          # Clean lines and extract specific indices based on standard NC structure
+          cleaned_lines = [line.strip() for line in lines]
+
+          # Safe extraction for Grade (typically row 5/6) and Section (row 7/8)
+          grade = (
+              cleaned_lines[5] if len(cleaned_lines) > 5 else "Unknown Grade"
+          )
+          section = (
+              cleaned_lines[7] if len(cleaned_lines) > 7 else "Unknown Section"
+          )
+
+          parsed_data.append({
+              "NC name": file.name,
+              "MM Section": section,
+              "Grade": grade,
+          })
+        except Exception as e:
+          parsed_data.append({
+              "NC name": file.name,
+              "MM Section": "Error",
+              "Grade": str(e),
+          })
+
+      df_nc = pd.DataFrame(parsed_data)
+
+      st.markdown("### Extracted Attributes Preview")
+      st.dataframe(df_nc, use_container_width=True)
+
+      # Create ZIP archive containing categorized folders
+      zip_buffer = io.BytesIO()
+      with zipfile.ZipFile(
+          zip_buffer, "w", zipfile.ZIP_DEFLATED
+      ) as zip_file:
+        for item in parsed_data:
+          filename = item["NC name"]
+          sec = item["MM Section"]
+          grd = item["Grade"]
+          folder_name = f"{sec}_{grd}"
+          file_path_in_zip = f"{folder_name}/{filename}"
+          if filename in file_contents_map:
+            zip_file.writestr(file_path_in_zip, file_contents_map[filename])
+
+      zip_buffer.seek(0)
+
+      col1, col2 = st.columns(2)
+      with col1:
+        # Excel summary download
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+          df_nc.to_excel(writer, index=False, sheet_name="NC_Summary")
+        excel_buffer.seek(0)
+
+        st.download_button(
+            label="📥 Download Summary Excel",
+            data=excel_buffer,
+            file_name="nc_files_summary.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+            use_container_width=True,
+        )
+
+      with col2:
+        # Organized Folder ZIP download
+        st.download_button(
+            label="📦 Download Sorted Folders (ZIP)",
+            data=zip_buffer,
+            file_name="sorted_nc_folders.zip",
+            mime="application/zip",
+            use_container_width=True,
+        )
 
   # --- OTHER PLACEHOLDER PAGES ---
   else:
