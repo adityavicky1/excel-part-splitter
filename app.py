@@ -296,7 +296,7 @@ else:
       except Exception as e:
         st.error(f"Error processing file: {e}")
 
-  # --- NC FILE SORTER & EXTRACTOR PAGE ---
+ # --- NC FILE SORTER & EXTRACTOR PAGE ---
   elif selected_page == "NC File Sorter & Extractor":
     st.title("📂 NC File Sorter & Extractor")
     st.write(
@@ -325,16 +325,42 @@ else:
           file_contents_map[file.name] = content_bytes
           lines = content_bytes.decode("utf-8", errors="ignore").splitlines()
 
-          # Clean lines and extract specific indices based on standard NC structure
-          cleaned_lines = [line.strip() for line in lines]
+          # Clean lines (strip whitespace)
+          cleaned_lines = [line.strip() for line in lines if line.strip()]
 
-          # Safe extraction for Grade (typically row 5/6) and Section (row 7/8)
-          grade = (
-              cleaned_lines[4] if len(cleaned_lines) > 5 else "Unknown Grade"
-          )
-          section = (
-              cleaned_lines[6] if len(cleaned_lines) > 7 else "Unknown Section"
-          )
+          # Robust parsing for DSTV / NC1 format:
+          # Filter out common header control tokens if needed, or extract based on known positions 
+          # In standard DSTV files, after the 'ST' line and project identifiers, 
+          # the material grade and profile (section) appear sequentially.
+          
+          grade = "Unknown Grade"
+          section = "Unknown Section"
+
+          # Let's find meaningful text lines (excluding pure numbers or block markers like ST, AK, BO, EN)
+          meaningful_lines = []
+          skip_next = False
+          for l in cleaned_lines:
+            if l in ["ST", "AK", "BO", "EN"]:
+              continue
+            meaningful_lines.append(l)
+
+          # Based on your sample structure:
+          # Line indices in meaningful_lines typically follow:
+          # [0]: 1000 (Version/Block code)
+          # [1]: ccs6-GR4-bfp-3 (Drawing/Part name)
+          # [2]: 1
+          # [3]: ccs6-GR4-bfp-3
+          # [4]: E450BR (Grade)
+          # [5]: 1
+          # [6]: PL10 (Section / Profile)
+          
+          if len(meaningful_lines) >= 7:
+            grade = meaningful_lines[4]
+            section = meaningful_lines[6]
+          elif len(cleaned_lines) > 7:
+            # Fallback to absolute index if meaningful lines filter is too aggressive
+            grade = cleaned_lines[5]
+            section = cleaned_lines[7]
 
           parsed_data.append({
               "NC name": file.name,
@@ -395,9 +421,7 @@ else:
             file_name="sorted_nc_folders.zip",
             mime="application/zip",
             use_container_width=True,
-        )
-
-  # --- OTHER PLACEHOLDER PAGES ---
+        )  # --- OTHER PLACEHOLDER PAGES ---
   else:
     st.title(f"📄 {selected_page}")
     st.write(f"Workspace for **{selected_page}** utility form.")
