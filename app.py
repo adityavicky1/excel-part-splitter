@@ -141,7 +141,6 @@ else:
             "Excel Part Splitter",
             "Merge PDF",
             "NC File Sorter & Extractor",
-            "BOM Extractor (Scanned Drawings)",
             "Under Construction",
         ],
         label_visibility="collapsed",
