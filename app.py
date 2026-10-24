@@ -4,6 +4,8 @@ import zipfile
 import pandas as pd
 from pypdf import PdfReader, PdfWriter
 import streamlit as st
+import fitz  # PyMuPDF
+from PIL import Image
 
 st.set_page_config(page_title="FABTECH India", page_icon="⚙️", layout="wide")
 
@@ -422,6 +424,53 @@ else:
             mime="application/zip",
             use_container_width=True,
         )  # --- OTHER PLACEHOLDER PAGES ---
+  # --- BOM EXTRACTOR PAGE SNIPPET ---
+elif selected_page == "BOM Extractor (Scanned Drawings)":
+    st.title("📋 Scanned Drawing BOM Extractor")
+    st.write(
+        "Upload scanned structural fabrication PDF drawings to crop and extract "
+        "the Material List (BOM) into structured tables."
+    )
+
+    pdf_files = st.file_uploader(
+        "Select Fabrication PDF Drawings",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="pdf_bom_uploader"
+    )
+
+    if pdf_files:
+        st.info(f"{len(pdf_files)} PDF file(s) uploaded.")
+        
+        extracted_boms = []
+
+        for pdf_file in pdf_files:
+            try:
+                pdf_file.seek(0)
+                doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+                
+                # Usually, drawings are single-page or BOM is on the first page
+                page = doc[0]
+                
+                # Render page to high-res image (Zoom factor = 2 for OCR clarity)
+                pix = page.get_pixmap(dpi=200)
+                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                
+                # Crop Region for BOM (Typically top-right or bottom-right quadrant)
+                # Coordinates are in pixels: (left, upper, right, lower)
+                width, height = img.size
+                # Example crop box for top-right header/BOM area (adjust based on your template)
+                crop_box = (int(width * 0.0), int(height * 0.0), int(width * 1.0), int(height * 0.35))
+                cropped_bom_img = img.crop(crop_box)
+
+                st.subheader(f"BOM Crop Preview: {pdf_file.name}")
+                st.image(cropped_bom_img, use_container_width=True)
+
+                # Note: You can plug an OCR engine or Vision LLM API call here 
+                # to dynamically convert 'cropped_bom_img' into the dataframe format above.
+
+            except Exception as e:
+                st.error(f"Error processing {pdf_file.name}: {e}")
   else:
     st.title(f"📄 {selected_page}")
     st.write(f"Workspace for **{selected_page}** utility form.")
