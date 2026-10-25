@@ -7,7 +7,7 @@ import streamlit as st
 import fitz    # PyMuPDF
 from PIL import Image
 
-st.set_page_config(page_title="FABTECH India", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="Bhartiya Industrial Supplies & Services", page_icon="⚙️", layout="wide")
 
 USERS = {
     "admin": "steel2026",
@@ -70,7 +70,7 @@ if not st.session_state.logged_in:
     st.markdown(
         """
             <div style="text-align: center; margin-top: 20px;">
-                <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">FAB TECH<br><span style="font-size: 20px;">INDIA</span></h1>
+                <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">BHARTIYA<br><span style="font-size: 20px;">INDUSTRIAL SUPPLIES & SERVICES</span></h1>
             </div>
         """,
         unsafe_allow_html=True,
@@ -121,7 +121,7 @@ else:
     st.markdown(
         f"""
             <div class="top-navbar">
-                <span>FAB TECH INDIA &nbsp;|&nbsp; Plant Utilities Dashboard</span>
+                <span>BHARTIYA INDUSTRIAL &nbsp;|&nbsp; Plant Utilities Dashboard</span>
                 <span>User: {st.session_state.username}</span>
             </div>
         """,
@@ -141,6 +141,7 @@ else:
             "Excel Part Splitter",
             "Merge PDF",
             "NC File Sorter & Extractor",
+            "Automated DPR Synthesizer",
             "Under Construction",
         ],
         label_visibility="collapsed",
@@ -415,6 +416,63 @@ else:
                     mime="application/zip",
                     use_container_width=True,
                 )
+
+    # --- AUTOMATED DPR SYNTHESIZER PAGE ---
+    elif selected_page == "Automated DPR Synthesizer":
+        st.title("📊 Automated DPR Synthesizer")
+        st.write(
+            "Consolidate daily production reports (DPR), track fabrication milestones, "
+            "and generate automated executive status summaries and metrics."
+        )
+
+        dpr_file = st.file_uploader(
+            "Upload Daily Production Report (Excel / CSV)",
+            type=["xlsx", "xls", "csv"],
+            key="dpr_uploader"
+        )
+
+        if dpr_file is not None:
+            try:
+                if dpr_file.name.endswith('.csv'):
+                    dpr_df = pd.read_csv(dpr_file)
+                else:
+                    dpr_df = pd.read_excel(dpr_file)
+
+                st.success("DPR file uploaded successfully!")
+                st.markdown("### 📋 Uploaded Data Preview")
+                st.dataframe(dpr_df, use_container_width=True)
+
+                st.markdown("### 📈 Synthesis & Metrics")
+                col_m1, col_m2, col_m3 = st.columns(3)
+                with col_m1:
+                    st.metric(label="Total Records / Entries", value=len(dpr_df))
+                with col_m2:
+                    if 'Weight' in dpr_df.columns or 'Wt' in dpr_df.columns:
+                        wt_col_name = 'Weight' if 'Weight' in dpr_df.columns else 'Wt'
+                        total_weight_sum = dpr_df[wt_col_name].sum()
+                        st.metric(label="Total Tonnage / Weight", value=f"{total_weight_sum:,.2f}")
+                    else:
+                        st.metric(label="Columns Detected", value=len(dpr_df.columns))
+                with col_m3:
+                    st.metric(label="Status", value="Ready for Export")
+
+                # Export synthesized summary
+                output_dpr = io.BytesIO()
+                with pd.ExcelWriter(output_dpr, engine="openpyxl") as writer:
+                    dpr_df.to_excel(writer, index=False, sheet_name="DPR_Synthesis")
+                output_dpr.seek(0)
+
+                st.download_button(
+                    label="📥 Download Synthesized DPR Report",
+                    data=output_dpr,
+                    file_name="synthesized_dpr_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"Error processing DPR file: {e}")
+        else:
+            st.info("Upload a daily production spreadsheet to begin synthesis.")
 
     elif selected_page == "Under Construction":
         st.title("🚧 Under Construction Module")
