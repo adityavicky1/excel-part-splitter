@@ -299,7 +299,7 @@ else:
                 st.error(f"Error processing file: {e}")
 
   # --- NC FILE SORTER & EXTRACTOR PAGE ---
-    elif selected_page == "NC File Sorter & Extractor":
+elif selected_page == "NC File Sorter & Extractor":
     st.title("📂 NC File Sorter & Extractor")
     st.write(
         "Upload your `.nc` or `.nc1` files to parse parameters (Grade & Section)"
@@ -310,7 +310,6 @@ else:
     st.markdown("### ⚙️ Parsing Configuration")
     col_cfg1, col_cfg2 = st.columns(2)
     with col_cfg1:
-        # 1-based indexing for user friendliness, converted to 0-based index below
         grade_line_idx = st.number_input(
             "Grade Line Number (1-based index)", min_value=1, value=5, step=1,
             help="Specify which line number in the cleaned file contains the Grade."
@@ -346,15 +345,12 @@ else:
                 grade = "Unknown Grade"
                 section = "Unknown Section"
 
-                # Optional filtering of boilerplate codes if needed, 
-                # or direct index retrieval from cleaned lines based on user choice:
                 meaningful_lines = []
                 for l in cleaned_lines:
                     if l in ["ST", "AK", "BO", "EN"]:
                         continue
                     meaningful_lines.append(l)
 
-                # Use the user-configured line indices safely
                 if len(meaningful_lines) > max(grade_line_idx, section_line_idx):
                     grade = meaningful_lines[grade_line_idx]
                     section = meaningful_lines[section_line_idx]
@@ -419,7 +415,6 @@ else:
                 mime="application/zip",
                 use_container_width=True,
             )
-     # --- UNDER CONSTRUCTION PAGE ---
     elif selected_page == "Under Construction":
         st.title("🚧 Under Construction Module")
         st.info("This module is currently under development for advanced plant integration.")
