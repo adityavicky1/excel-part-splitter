@@ -299,7 +299,7 @@ else:
                 st.error(f"Error processing file: {e}")
 
   # --- NC FILE SORTER & EXTRACTOR PAGE ---
-elif selected_page == "NC File Sorter & Extractor":
+    elif selected_page == "NC File Sorter & Extractor":
     st.title("📂 NC File Sorter & Extractor")
     st.write(
         "Upload your `.nc` or `.nc1` files to parse parameters (Grade & Section)"
