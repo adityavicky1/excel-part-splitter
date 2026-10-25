@@ -298,111 +298,127 @@ else:
             except Exception as e:
                 st.error(f"Error processing file: {e}")
 
-    # --- NC FILE SORTER & EXTRACTOR PAGE ---
-    elif selected_page == "NC File Sorter & Extractor":
-        st.title("📂 NC File Sorter & Extractor")
-        st.write(
-            "Upload your `.nc` or `.nc1` files to parse parameters (Grade & Section)"
-            " and organize them automatically into folders based on **MM Section** and"
-            " **Grade**."
-        )
+  # --- NC FILE SORTER & EXTRACTOR PAGE ---
+elif selected_page == "NC File Sorter & Extractor":
+    st.title("📂 NC File Sorter & Extractor")
+    st.write(
+        "Upload your `.nc` or `.nc1` files to parse parameters (Grade & Section)"
+        " and organize them automatically into folders based on **MM Section** and **Grade**."
+    )
 
-        nc_files = st.file_uploader(
-            "Select NC Files",
-            type=["nc", "nc1"],
-            accept_multiple_files=True,
-            key="nc_uploader",
-        )
+    # --- Configuration Inputs for Indexing ---
+    st.markdown("### ⚙️ Parsing Configuration")
+    col_cfg1, col_cfg2 = st.columns(2)
+    with col_cfg1:
+        # 1-based indexing for user friendliness, converted to 0-based index below
+        grade_line_idx = st.number_input(
+            "Grade Line Number (1-based index)", min_value=1, value=5, step=1,
+            help="Specify which line number in the cleaned file contains the Grade."
+        ) - 1
+    with col_cfg2:
+        section_line_idx = st.number_input(
+            "MM Section Line Number (1-based index)", min_value=1, value=7, step=1,
+            help="Specify which line number in the cleaned file contains the MM Section."
+        ) - 1
 
-        if nc_files:
-            st.info(f"{len(nc_files)} NC file(s) uploaded successfully.")
+    nc_files = st.file_uploader(
+        "Select NC Files",
+        type=["nc", "nc1"],
+        accept_multiple_files=True,
+        key="nc_uploader",
+    )
 
-            parsed_data = []
-            file_contents_map = {}
+    if nc_files:
+        st.info(f"{len(nc_files)} NC file(s) uploaded successfully.")
 
-            for file in nc_files:
-                try:
-                    file.seek(0)
-                    content_bytes = file.read()
-                    file_contents_map[file.name] = content_bytes
-                    lines = content_bytes.decode("utf-8", errors="ignore").splitlines()
+        parsed_data = []
+        file_contents_map = {}
 
-                    cleaned_lines = [line.strip() for line in lines if line.strip()]
+        for file in nc_files:
+            try:
+                file.seek(0)
+                content_bytes = file.read()
+                file_contents_map[file.name] = content_bytes
+                lines = content_bytes.decode("utf-8", errors="ignore").splitlines()
 
-                    grade = "Unknown Grade"
-                    section = "Unknown Section"
+                cleaned_lines = [line.strip() for line in lines if line.strip()]
 
-                    meaningful_lines = []
-                    for l in cleaned_lines:
-                        if l in ["ST", "AK", "BO", "EN"]:
-                            continue
-                        meaningful_lines.append(l)
+                grade = "Unknown Grade"
+                section = "Unknown Section"
 
-                    if len(meaningful_lines) >= 7:
-                        grade = meaningful_lines[4]
-                        section = meaningful_lines[6]
-                    elif len(cleaned_lines) > 7:
-                        grade = cleaned_lines[5]
-                        section = cleaned_lines[7]
+                # Optional filtering of boilerplate codes if needed, 
+                # or direct index retrieval from cleaned lines based on user choice:
+                meaningful_lines = []
+                for l in cleaned_lines:
+                    if l in ["ST", "AK", "BO", "EN"]:
+                        continue
+                    meaningful_lines.append(l)
 
-                    parsed_data.append({
-                        "NC name": file.name,
-                        "MM Section": section,
-                        "Grade": grade,
-                    })
-                except Exception as e:
-                    parsed_data.append({
-                        "NC name": file.name,
-                        "MM Section": "Error",
-                        "Grade": str(e),
-                    })
+                # Use the user-configured line indices safely
+                if len(meaningful_lines) > max(grade_line_idx, section_line_idx):
+                    grade = meaningful_lines[grade_line_idx]
+                    section = meaningful_lines[section_line_idx]
+                elif len(cleaned_lines) > max(grade_line_idx, section_line_idx):
+                    grade = cleaned_lines[grade_line_idx]
+                    section = cleaned_lines[section_line_idx]
 
-            df_nc = pd.DataFrame(parsed_data)
+                parsed_data.append({
+                    "NC name": file.name,
+                    "MM Section": section,
+                    "Grade": grade,
+                })
+            except Exception as e:
+                parsed_data.append({
+                    "NC name": file.name,
+                    "MM Section": "Error",
+                    "Grade": str(e),
+                })
 
-            st.markdown("### Extracted Attributes Preview")
-            st.dataframe(df_nc, use_container_width=True)
+        df_nc = pd.DataFrame(parsed_data)
 
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(
-                zip_buffer, "w", zipfile.ZIP_DEFLATED
-            ) as zip_file:
-                for item in parsed_data:
-                    filename = item["NC name"]
-                    sec = item["MM Section"]
-                    grd = item["Grade"]
-                    folder_name = f"{sec}_{grd}"
-                    file_path_in_zip = f"{folder_name}/{filename}"
-                    if filename in file_contents_map:
-                        zip_file.writestr(file_path_in_zip, file_contents_map[filename])
+        st.markdown("### Extracted Attributes Preview")
+        st.dataframe(df_nc, use_container_width=True)
 
-            zip_buffer.seek(0)
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(
+            zip_buffer, "w", zipfile.ZIP_DEFLATED
+        ) as zip_file:
+            for item in parsed_data:
+                filename = item["NC name"]
+                sec = item["MM Section"]
+                grd = item["Grade"]
+                folder_name = f"{sec}_{grd}"
+                file_path_in_zip = f"{folder_name}/{filename}"
+                if filename in file_contents_map:
+                    zip_file.writestr(file_path_in_zip, file_contents_map[filename])
 
-            col1, col2 = st.columns(2)
-            with col1:
-                excel_buffer = io.BytesIO()
-                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                    df_nc.to_excel(writer, index=False, sheet_name="NC_Summary")
-                excel_buffer.seek(0)
+        zip_buffer.seek(0)
 
-                st.download_button(
-                    label="📥 Download Summary Excel",
-                    data=excel_buffer,
-                    file_name="nc_files_summary.xlsx",
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    ),
-                    use_container_width=True,
-                )
+        col1, col2 = st.columns(2)
+        with col1:
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                df_nc.to_excel(writer, index=False, sheet_name="NC_Summary")
+            excel_buffer.seek(0)
 
-            with col2:
-                st.download_button(
-                    label="📦 Download Sorted Folders (ZIP)",
-                    data=zip_buffer,
-                    file_name="sorted_nc_folders.zip",
-                    mime="application/zip",
-                    use_container_width=True,
-                )
+            st.download_button(
+                label="📥 Download Summary Excel",
+                data=excel_buffer,
+                file_name="nc_files_summary.xlsx",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
+                use_container_width=True,
+            )
 
+        with col2:
+            st.download_button(
+                label="📦 Download Sorted Folders (ZIP)",
+                data=zip_buffer,
+                file_name="sorted_nc_folders.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
      # --- UNDER CONSTRUCTION PAGE ---
     elif selected_page == "Under Construction":
         st.title("🚧 Under Construction Module")
