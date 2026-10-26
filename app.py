@@ -436,16 +436,17 @@ else:
                     use_container_width=True,
                 )
 
-    # --- SMART FILE FINDER & EXTRACTOR PAGE (Excel-driven lookup) ---
+    # --- SMART FILE FINDER & EXTRACTOR PAGE (Upload-driven lookup) ---
     elif selected_page == "Smart File Finder & Extractor":
         st.markdown("<h2>Smart File Finder & Extractor</h2>", unsafe_allow_html=True)
         st.write(
-            "Upload an Excel list containing the required file identifiers (e.g., numbers 4, 21, 38, 86, 99), "
-            "provide the source directory folder path where your files are stored, and automatically extract them into a ZIP."
+            "Upload your criteria Excel sheet containing the required file names/numbers, "
+            "then upload your source files below to automatically filter and extract them into a ZIP."
         )
 
+        # Step 1: Upload Excel criteria file
         criteria_file = st.file_uploader(
-            "1. Upload Excel File containing Required File List (e.g. 1-100 list)",
+            "1. Upload Excel File containing Required File List",
             type=["xlsx", "xls", "csv"],
             key="criteria_uploader"
         )
@@ -465,7 +466,7 @@ else:
 
                 col_options = criteria_df.columns.tolist()
                 selected_column = st.selectbox(
-                    "Select Column containing File Numbers/Names to extract (e.g., Mark No, ID, File Name):",
+                    "Select Column containing File Numbers/Names to extract:",
                     col_options
                 )
 
@@ -476,51 +477,57 @@ else:
                 st.error(f"Error reading criteria spreadsheet: {e}")
 
         st.markdown("---")
-        folder_path = st.text_input("2. Enter Source Directory Folder Path (where thousands of files are stored):")
 
-        if folder_path and target_search_values:
-            if os.path.exists(folder_path) and os.path.isdir(folder_path):
-                try:
-                    found_files_map = {}
-                    all_dir_files = os.listdir(folder_path)
+        # Step 2: Upload source files directly through browser
+        source_files = st.file_uploader(
+            "2. Upload Source Files (Select all files from your folder to match against)",
+            accept_multiple_files=True,
+            key="source_files_uploader"
+        )
 
-                    for filename in all_dir_files:
-                        base_name, _ = os.path.splitext(filename)
-                        for target in target_search_values:
-                            if target.lower() == base_name.lower() or target.lower() in filename.lower():
-                                found_files_map[target] = os.path.join(folder_path, filename)
+        if source_files and target_search_values:
+            try:
+                found_files_map = {}  # target -> uploaded_file object
 
-                    st.markdown("### Matching Results Summary")
-                    st.write(f"Matched **{len(found_files_map)}** out of **{len(target_search_values)}** requested files in the folder.")
+                for file in source_files:
+                    base_name, _ = os.path.splitext(file.name)
+                    for target in target_search_values:
+                        if target.lower() == base_name.lower() or target.lower() in file.name.lower():
+                            found_files_map[target] = file
 
-                    if found_files_map:
-                        matched_df = pd.DataFrame(list(found_files_map.items()), columns=["Requested Identifier", "Matched File Path"])
-                        st.dataframe(matched_df, use_container_width=True)
+                st.markdown("### Matching Results Summary")
+                st.write(f"Matched **{len(found_files_map)}** out of **{len(target_search_values)}** requested files.")
 
-                        if st.button("📦 Package Matched Files into ZIP", type="primary"):
-                            extracted_zip_buffer = io.BytesIO()
-                            with zipfile.ZipFile(extracted_zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                                for tgt, fpath in found_files_map.items():
-                                    if os.path.exists(fpath):
-                                        zf.write(fpath, arcname=os.path.basename(fpath))
-                            extracted_zip_buffer.seek(0)
+                if found_files_map:
+                    matched_df = pd.DataFrame(
+                        [{"Requested Identifier": k, "Matched Filename": v.name} for k, v in found_files_map.items()]
+                    )
+                    st.dataframe(matched_df, use_container_width=True)
 
-                            st.success("Requested documents packaged successfully!")
-                            st.download_button(
-                                label="📥 Download Extracted Files (ZIP)",
-                                data=extracted_zip_buffer,
-                                file_name="matched_extracted_files.zip",
-                                mime="application/zip",
-                                use_container_width=True
-                            )
-                    else:
-                        st.warning("No matching files found in the directory for the identifiers provided in your Excel sheet.")
-                except Exception as e:
-                    st.error(f"Error scanning directory: {e}")
-            else:
-                st.error("Invalid folder path or directory does not exist. Please check the path and try again.")
+                    if st.button("📦 Package Matched Files into ZIP", type="primary"):
+                        extracted_zip_buffer = io.BytesIO()
+                        with zipfile.ZipFile(extracted_zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                            for tgt, fobj in found_files_map.items():
+                                fobj.seek(0)
+                                zf.writestr(fobj.name, fobj.read())
+                        extracted_zip_buffer.seek(0)
+
+                        st.success("Requested documents packaged successfully!")
+                        st.download_button(
+                            label="📥 Download Extracted Files (ZIP)",
+                            data=extracted_zip_buffer,
+                            file_name="matched_extracted_files.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+                else:
+                    st.warning("No matching files found among the uploaded source files for the identifiers provided in your Excel sheet.")
+            except Exception as e:
+                st.error(f"Error processing files: {e}")
         elif not criteria_file:
-            st.info("Please upload your criteria Excel sheet (listing the files you require) to get started.")
+            st.info("Please upload your criteria Excel sheet to get started.")
+        elif not source_files:
+            st.info("Please upload the source files to match against.")
 
     # --- AUTOMATED DPR SYNTHESIZER PAGE ---
     elif selected_page == "Automated DPR Synthesizer":
