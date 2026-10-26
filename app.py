@@ -717,73 +717,41 @@ else:
         st.markdown("<h2>Advanced OCR Text Converter</h2>", unsafe_allow_html=True)
         st.write(
             "Upload scanned engineering documents, nameplates, or drawing snapshots (PNG, JPG) "
-            "to extract embedded text using automated image preprocessing and Tesseract OCR."
+            "to extract embedded text using EasyOCR."
         )
  
-        col_ocr1, col_ocr2 = st.columns([1.2, 1])
-        with col_ocr1:
-            ocr_image = st.file_uploader("Upload Scanned Image / Document", type=["png", "jpg", "jpeg", "tiff"], key="ocr_uploader")
-        
-        with col_ocr2:
-            st.markdown("### ⚙️ OCR Preprocessing Settings")
-            do_grayscale = st.checkbox("Convert to Grayscale", value=True, help="Removes color noise to improve character edge detection.")
-            do_sharpen = st.checkbox("Enhance Contrast & Sharpness", value=True, help="Sharpens blurry characters for better OCR accuracy.")
-            ocr_lang = st.selectbox("Language Model", ["eng", "eng+hin"], help="Select recognition language.")
+        ocr_image = st.file_uploader("Upload Scanned Image / Document", type=["png", "jpg", "jpeg"], key="ocr_uploader")
 
         if ocr_image is not None:
             try:
-                from PIL import Image, ImageOps, ImageEnhance
-                import pytesseract
+                from PIL import Image
+                import easyocr
+                import numpy as np
 
                 image = Image.open(ocr_image)
-                
-                st.markdown("---")
-                st.markdown("### 🖼️ Image Preview & Processed View")
-                prev_col1, prev_col2 = st.columns(2)
-                with prev_col1:
-                    st.image(image, caption="Original Image", use_container_width=True)
+                st.image(image, caption="Uploaded Image Preview", use_container_width=True)
 
-                # Preprocessing pipeline for stronger OCR results
-                processed_image = image.copy()
-                if do_grayscale:
-                    processed_image = ImageOps.grayscale(processed_image)
-                if do_sharpen:
-                    enhancer = ImageEnhance.Contrast(processed_image)
-                    processed_image = enhancer.enhance(2.0) # Boost contrast
-                    sharp_enhancer = ImageEnhance.Sharpness(processed_image)
-                    processed_image = sharp_enhancer.enhance(1.5)
+                if st.button("🚀 Run OCR Extraction", type="primary", use_container_width=True):
+                    with st.spinner("Loading OCR model and scanning text..."):
+                        # Initialize EasyOCR reader (runs completely in Python, no binaries needed)
+                        reader = easyocr.Reader(['en'], gpu=False)
+                        results = reader.readtext(np.array(image))
+                        
+                        extracted_text = "\n".join([res[1] for res in results])
+                        
+                        if not extracted_text.strip():
+                            st.warning("No text could be detected in the image.")
+                        else:
+                            st.success("OCR Extraction Completed Successfully!")
+                            st.markdown("### 📝 Extracted Text Output")
+                            st.text_area("Result Editor", value=extracted_text, height=250)
 
-                with prev_col2:
-                    st.image(processed_image, caption="Preprocessed Image (Optimized for OCR)", use_container_width=True)
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🚀 Run High-Accuracy OCR Extraction", type="primary", use_container_width=True):
-                    with st.spinner("Extracting text layers and analyzing layout..."):
-                        try:
-                            # Perform OCR extraction using pytesseract
-                            extracted_text = pytesseract.image_to_string(processed_image, lang=ocr_lang)
-                            
-                            if not extracted_text.strip():
-                                st.warning("No text could be detected in the image. Try adjusting the preprocessing filters or uploading a higher-resolution scan.")
-                            else:
-                                st.success("OCR Extraction Completed Successfully!")
-                                st.markdown("### 📝 Extracted Text Output")
-                                st.text_area("Result Editor", value=extracted_text, height=250)
-
-                                # Download options
-                                text_bytes = extracted_text.encode("utf-8")
-                                st.download_button(
-                                    label="📥 Download Extracted Text (.txt)",
-                                    data=text_bytes,
-                                    file_name="ocr_extracted_text.txt",
-                                    mime="text/plain",
-                                    use_container_width=True
-                                )
-                        except pytesseract.TesseractNotFoundError:
-                            st.error(
-                                "Tesseract OCR binary is not installed on this system. "
-                                "To run local OCR, ensure Tesseract-OCR is installed on your server/machine "
-                                "(e.g., via `sudo apt-get install tesseract-ocr` on Linux or downloading the Windows binary)."
+                            st.download_button(
+                                label="📥 Download Extracted Text (.txt)",
+                                data=extracted_text.encode("utf-8"),
+                                file_name="ocr_extracted_text.txt",
+                                mime="text/plain",
+                                use_container_width=True
                             )
             except Exception as e:
                 st.error(f"Error processing OCR: {e}")
