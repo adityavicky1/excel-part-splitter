@@ -156,6 +156,7 @@ else:
         [
             "Merge PDF",
             "Excel Part Splitter",
+            "Excel Sheet Combiner",
             "NC File Sorter & Extractor",
             "Automated DPR Synthesizer",
             "Subscription Plans & Billing",
@@ -163,48 +164,6 @@ else:
         ],
         label_visibility="collapsed",
     )
-
-    # --- DYNAMIC SIDEBAR EXCEL COMBINER (Appears when input spreadsheets are uploaded) ---
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📑 Excel Sheet Combiner")
-    sidebar_excel_files = st.sidebar.file_uploader(
-        "Attach Excel/CSV Files",
-        type=["xlsx", "xls", "csv"],
-        accept_multiple_files=True,
-        key="sidebar_excel_combiner"
-    )
-
-    if sidebar_excel_files:
-        st.sidebar.success(f"{len(sidebar_excel_files)} file(s) attached.")
-        if st.sidebar.button("Combine Attached Files", use_container_width=True):
-            try:
-                side_dfs = []
-                for f in sidebar_excel_files:
-                    if f.name.endswith('.csv'):
-                        tdf = pd.read_csv(f)
-                    else:
-                        tdf = pd.read_excel(f)
-                    tdf["Source_File"] = f.name
-                    side_dfs.append(tdf)
-                
-                side_master = pd.concat(side_dfs, ignore_index=True)
-                st.sidebar.session_state.combined_side_df = side_master
-                st.sidebar.success("Combined successfully!")
-            except Exception as e:
-                st.sidebar.error(f"Error: {e}")
-
-        if "combined_side_df" in st.session_state:
-            side_out = io.BytesIO()
-            with pd.ExcelWriter(side_out, engine="openpyxl") as writer:
-                st.session_state.combined_side_df.to_excel(writer, index=False, sheet_name="Combined_Master")
-            side_out.seek(0)
-            st.sidebar.download_button(
-                label="📥 Download Combined Master",
-                data=side_out,
-                file_name="combined_master_output.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
 
     # Display total user tracking in sidebar (Admin Analytics)
     st.sidebar.markdown("---")
@@ -322,6 +281,54 @@ else:
                     )
             except Exception as e:
                 st.error(f"Error processing file: {e}")
+
+    # --- EXCEL SHEET COMBINER PAGE ---
+    elif selected_page == "Excel Sheet Combiner":
+        st.markdown("<h2>Excel Sheet Combiner</h2>", unsafe_allow_html=True)
+        st.write("Upload multiple Excel or CSV files to consolidate them into a single comprehensive master workbook.")
+
+        combiner_files = st.file_uploader(
+            "Select Excel or CSV Files to Combine",
+            type=["xlsx", "xls", "csv"],
+            accept_multiple_files=True,
+            key="excel_combiner_uploader"
+        )
+
+        if combiner_files:
+            st.info(f"{len(combiner_files)} file(s) selected successfully.")
+            if st.button("Combine Spreadsheets", type="primary"):
+                try:
+                    all_dfs = []
+                    for f in combiner_files:
+                        f.seek(0)
+                        if f.name.endswith('.csv'):
+                            temp_df = pd.read_csv(f)
+                        else:
+                            temp_df = pd.read_excel(f)
+                        temp_df["Source_File"] = f.name
+                        all_dfs.append(temp_df)
+                    
+                    master_df = pd.concat(all_dfs, ignore_index=True)
+                    st.success("Spreadsheets combined successfully!")
+                    st.markdown("### Combined Master Preview")
+                    st.dataframe(master_df, use_container_width=True)
+
+                    combined_buffer = io.BytesIO()
+                    with pd.ExcelWriter(combined_buffer, engine="openpyxl") as writer:
+                        master_df.to_excel(writer, index=False, sheet_name="Master_Combined")
+                    combined_buffer.seek(0)
+
+                    st.download_button(
+                        label="📥 Download Combined Master Excel",
+                        data=combined_buffer,
+                        file_name="combined_master_output.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Error combining files: {e}")
+        else:
+            st.info("Upload two or more spreadsheet files to begin combining.")
 
     # --- NC FILE SORTER & EXTRACTOR PAGE ---
     elif selected_page == "NC File Sorter & Extractor":
