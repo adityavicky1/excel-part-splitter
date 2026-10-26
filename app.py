@@ -159,7 +159,6 @@ else:
             "Excel Sheet Combiner",
             "NC File Sorter & Extractor",
             "Smart File Finder & Extractor",
-            "SMART FILE FINDER & EXTRACTOR PAGE (Excel-driven lookup)",
             "Automated DPR Synthesizer",
             "Subscription Plans & Billing",
             "Under Construction",
@@ -437,74 +436,6 @@ else:
                     use_container_width=True,
                 )
 
-    # --- SMART FILE FINDER & EXTRACTOR PAGE ---
-    elif selected_page == "Smart File Finder & Extractor":
-        st.markdown("<h2>Smart File Finder & Extractor</h2>", unsafe_allow_html=True)
-        st.write(
-            "Scan a local directory folder, filter files by extension (e.g. `.xlsx`, `.doc`, `.pdf`, `.nc`), "
-            "and pick specific documents out of thousands to package into a download ZIP."
-        )
-
-        col_f1, col_f2 = st.columns([2, 1])
-        with col_f1:
-            folder_path = st.text_input("Enter Local Folder Path (e.g., C:/Projects/Fabrication_Files or /app/data):")
-        with col_f2:
-            file_extension = st.selectbox(
-                "Filter by Extension",
-                ["all", "xlsx", "xls", "doc", "docx", "ppt", "pptx", "pdf", "nc", "nc1", "txt", "csv"]
-            )
-
-        if folder_path:
-            if os.path.exists(folder_path) and os.path.isdir(folder_path):
-                try:
-                    all_matched_files = []
-                    for root, dirs, files in os.walk(folder_path):
-                        for file in files:
-                            if file_extension == "all" or file.lower().endswith(f".{file_extension.lower()}"):
-                                full_path = os.path.join(root, file)
-                                rel_path = os.path.relpath(full_path, folder_path)
-                                all_matched_files.append(rel_path)
-
-                    st.info(f"Found {len(all_matched_files)} matching file(s) in the specified directory.")
-
-                    if all_matched_files:
-                        st.markdown("### Select Required Documents")
-                        # Multiselect widget to pick specific files out of the total set
-                        selected_target_files = st.multiselect(
-                            "Choose specific files to extract:",
-                            options=all_matched_files,
-                            default=all_matched_files[:min(10, len(all_matched_files))]  # default first 10
-                        )
-
-                        if selected_target_files:
-                            st.write(f"Selected **{len(selected_target_files)}** file(s) for extraction.")
-
-                            if st.button("📦 Package Selected Files into ZIP", type="primary"):
-                                finder_zip_buffer = io.BytesIO()
-                                with zipfile.ZipFile(finder_zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                                    for target_file in selected_target_files:
-                                        abs_file_path = os.path.join(folder_path, target_file)
-                                        if os.path.exists(abs_file_path):
-                                            zf.write(abs_file_path, arcname=target_file)
-                                finder_zip_buffer.seek(0)
-
-                                st.success("Selected documents packaged successfully!")
-                                st.download_button(
-                                    label="📥 Download Extracted Files (ZIP)",
-                                    data=finder_zip_buffer,
-                                    file_name="extracted_documents.zip",
-                                    mime="application/zip",
-                                    use_container_width=True
-                                )
-                    else:
-                        st.warning("No files found matching the criteria in this folder.")
-                except Exception as e:
-                    st.error(f"Error scanning directory: {e}")
-            else:
-                st.error("Invalid folder path or directory does not exist. Please check the path and try again.")
-        else:
-            st.info("Please enter a valid directory folder path above to begin searching.")
-            
     # --- SMART FILE FINDER & EXTRACTOR PAGE (Excel-driven lookup) ---
     elif selected_page == "Smart File Finder & Extractor":
         st.markdown("<h2>Smart File Finder & Extractor</h2>", unsafe_allow_html=True)
@@ -513,7 +444,6 @@ else:
             "provide the source directory folder path where your files are stored, and automatically extract them into a ZIP."
         )
 
-        # Step 1: Upload Excel criteria file
         criteria_file = st.file_uploader(
             "1. Upload Excel File containing Required File List (e.g. 1-100 list)",
             type=["xlsx", "xls", "csv"],
@@ -533,7 +463,6 @@ else:
                 st.success("Criteria spreadsheet loaded successfully!")
                 st.dataframe(criteria_df.head(), use_container_width=True)
 
-                # Pick column containing the target file numbers/names
                 col_options = criteria_df.columns.tolist()
                 selected_column = st.selectbox(
                     "Select Column containing File Numbers/Names to extract (e.g., Mark No, ID, File Name):",
@@ -541,25 +470,22 @@ else:
                 )
 
                 if selected_column:
-                    # Clean and extract unique target values as strings
                     target_search_values = criteria_df[selected_column].dropna().astype(str).str.strip().tolist()
                     st.info(f"Loaded **{len(target_search_values)}** target file identifier(s) from the spreadsheet.")
             except Exception as e:
                 st.error(f"Error reading criteria spreadsheet: {e}")
 
         st.markdown("---")
-        # Step 2: Provide folder path and match
         folder_path = st.text_input("2. Enter Source Directory Folder Path (where thousands of files are stored):")
 
         if folder_path and target_search_values:
             if os.path.exists(folder_path) and os.path.isdir(folder_path):
                 try:
-                    found_files_map = {} # target_value -> full_path
+                    found_files_map = {}
                     all_dir_files = os.listdir(folder_path)
 
                     for filename in all_dir_files:
                         base_name, _ = os.path.splitext(filename)
-                        # Check if base file name matches any of our target items
                         for target in target_search_values:
                             if target.lower() == base_name.lower() or target.lower() in filename.lower():
                                 found_files_map[target] = os.path.join(folder_path, filename)
