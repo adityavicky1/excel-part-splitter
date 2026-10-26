@@ -155,6 +155,7 @@ else:
         "Navigation",
         [
             "Merge PDF",
+            "PDF Drawing Splitter & Renamer",
             "Excel Part Splitter",
             "Excel Sheet Combiner",
             "NC File Sorter & Extractor",
@@ -218,7 +219,108 @@ else:
                     )
                 except Exception as e:
                     st.error(f"Error merging files: {e}")
+# --- PDF DRAWING SPLITTER & RENAMER PAGE ---
+    elif selected_page == "PDF Drawing Splitter & Renamer":
+        st.markdown("<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True)
+        st.write(
+            "Upload a multi-page drawing binder PDF. The app will extract each page, "
+            "attempt to auto-detect drawing numbers from the title blocks, and let you export them as individually named files."
+        )
 
+        drawing_pdf = st.file_uploader(
+            "Upload Multi-Page Drawing Binder PDF",
+            type=["pdf"],
+            key="drawing_splitter_uploader"
+        )
+
+        if drawing_pdf is not None:
+            try:
+                reader = PdfReader(drawing_pdf)
+                num_pages = len(reader.pages)
+                st.success(f"Successfully loaded PDF binder with **{num_pages}** pages.")
+
+                # Extract text page by page to find potential drawing numbers
+                page_data = []
+                for idx, page in enumerate(reader.pages):
+                    text = page.extract_text() or ""
+                    # Basic heuristic: look for lines containing common drawing number labels or take first non-empty line
+                    lines = [line.strip() for line in text.splitlines() if line.strip()]
+                    
+                    # Default fallback name
+                    default_name = f"Drawing_Page_{idx+1}"
+                    
+                    # Simple pattern search for drawing numbers in text
+                    detected_no = default_name
+                    for line in lines:
+                        if "dwg" in line.lower() or "drawing" in line.lower() or "no." in line.lower():
+                            detected_no = line.replace(":", "_").replace("/", "-")
+                            break
+                    
+                    # Limit length of auto-detected string to keep filenames safe
+                    if len(detected_no) > 50:
+                        detected_no = f"Drawing_{idx+1}"
+
+                    page_data.append({
+                        "Page Number": idx + 1,
+                        "Auto-Detected Drawing Number / Name": detected_no,
+                        "Text Preview": text[:100].replace("\n", " ")  # First 100 chars preview
+                    })
+
+                df_drawings = pd.DataFrame(page_data)
+
+                st.markdown("### 📋 Review & Customize Drawing Filenames")
+                st.write("You can edit the drawing numbers in the table below before generating the final files:")
+                
+                # Interactive data editor so user can fix any misidentified drawing numbers
+                edited_df = st.data_editor(
+                    df_drawings,
+                    column_config={
+                        "Page Number": st.column_config.NumberColumn(disabled=True),
+                        "Text Preview": st.column_config.TextColumn(disabled=True),
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                if st.button("📦 Split and Package Drawings into ZIP", type="primary"):
+                    zip_output = io.BytesIO()
+                    with zipfile.ZipFile(zip_output, "w", zipfile.ZIP_DEFLATED) as zf:
+                        for index, row in edited_df.iterrows():
+                            page_num = int(row["Page Number"])
+                            custom_name = str(row["Auto-Detected Drawing Number / Name"]).strip()
+                            
+                            # Clean filename to remove illegal characters
+                            safe_filename = "".join(c for c in custom_name if c.isalnum() or c in (' ', '.', '_', '-')).strip()
+                            if not safe_filename:
+                                safe_filename = f"Drawing_Page_{page_num}"
+                            
+                            filename = f"{safe_filename}.pdf"
+
+                            # Write single page to a temporary buffer
+                            writer = PdfWriter()
+                            writer.add_page(reader.pages[page_num - 1])
+                            
+                            page_buffer = io.BytesIO()
+                            writer.write(page_buffer)
+                            page_buffer.seek(0)
+                            
+                            # Add to ZIP
+                            zf.writestr(filename, page_buffer.read())
+
+                    zip_output.seek(0)
+                    st.success("All drawings successfully split and renamed!")
+                    st.download_button(
+                        label="📥 Download Separated Drawings (ZIP)",
+                        data=zip_output,
+                        file_name="separated_drawings.zip",
+                        mime="application/zip",
+                        use_container_width=True
+                    )
+
+            except Exception as e:
+                st.error(f"Error processing PDF binder: {e}")
     # --- EXCEL PART SPLITTER PAGE ---
     elif selected_page == "Excel Part Splitter":
         st.markdown("<h2>Excel Part Splitter Automation</h2>", unsafe_allow_html=True)
