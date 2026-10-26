@@ -162,7 +162,6 @@ else:
             "Smart File Finder & Extractor",
             "Automated DPR Synthesizer",
             "PDF to Table",
-            "OCR Converter",
             "Pdf page splitter",
             "Image to PDF",
             "Subscription Plans & Billing",
@@ -712,49 +711,7 @@ else:
             except Exception as e:
                 st.error(f"Error parsing PDF tables: {e}")
 
-   # --- OCR CONVERTER PAGE ---
-    elif selected_page == "OCR Converter":
-        st.markdown("<h2>Advanced OCR Text Converter</h2>", unsafe_allow_html=True)
-        st.write(
-            "Upload scanned engineering documents, nameplates, or drawing snapshots (PNG, JPG) "
-            "to extract embedded text using EasyOCR."
-        )
- 
-        ocr_image = st.file_uploader("Upload Scanned Image / Document", type=["png", "jpg", "jpeg"], key="ocr_uploader")
-
-        if ocr_image is not None:
-            try:
-                from PIL import Image
-                import easyocr
-                import numpy as np
-
-                image = Image.open(ocr_image)
-                st.image(image, caption="Uploaded Image Preview", use_container_width=True)
-
-                if st.button("🚀 Run OCR Extraction", type="primary", use_container_width=True):
-                    with st.spinner("Loading OCR model and scanning text..."):
-                        # Initialize EasyOCR reader (runs completely in Python, no binaries needed)
-                        reader = easyocr.Reader(['en'], gpu=False)
-                        results = reader.readtext(np.array(image))
-                        
-                        extracted_text = "\n".join([res[1] for res in results])
-                        
-                        if not extracted_text.strip():
-                            st.warning("No text could be detected in the image.")
-                        else:
-                            st.success("OCR Extraction Completed Successfully!")
-                            st.markdown("### 📝 Extracted Text Output")
-                            st.text_area("Result Editor", value=extracted_text, height=250)
-
-                            st.download_button(
-                                label="📥 Download Extracted Text (.txt)",
-                                data=extracted_text.encode("utf-8"),
-                                file_name="ocr_extracted_text.txt",
-                                mime="text/plain",
-                                use_container_width=True
-                            )
-            except Exception as e:
-                st.error(f"Error processing OCR: {e}")
+  
     # --- PDF PAGE SPLITTER PAGE ---
     elif selected_page == "Pdf page splitter":
         st.markdown("<h2>PDF Page Splitter</h2>", unsafe_allow_html=True)
