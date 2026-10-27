@@ -169,12 +169,12 @@ else:
                 except Exception as e:
                     st.error(f"Error merging files: {e}")
 
-   # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
+  # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
     elif selected_page == "PDF Drawing Splitter & Renamer":
         st.markdown("<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True)
         st.write(
             "Upload a multi-page drawing binder PDF. The app will extract each page, "
-            "attempt to auto-detect drawing numbers from the title blocks, and "
+            "auto-detect the AMNS Drawing Number from the title block, and "
             "let you export them as individually named files."
         )
 
@@ -186,28 +186,40 @@ else:
 
         if drawing_pdf is not None:
             try:
-                # Use strict = False to help bypass overly rigid structural warnings in CAD PDFs
                 reader = PdfReader(drawing_pdf, strict=False)
                 num_pages = len(reader.pages)
                 st.success(f"Successfully loaded PDF binder with **{num_pages}** pages.")
 
                 page_data = []
+                import re
+                
                 for idx, page in enumerate(reader.pages):
                     try:
                         text = page.extract_text() or ""
                     except Exception:
-                        text = ""  # Fallback if an individual stream hits token limits
-                        
-                    lines = [line.strip() for line in text.splitlines() if line.strip()]
+                        text = ""
                     
                     default_name = f"Drawing_Page_{idx+1}"
                     detected_no = default_name
-                    for line in lines:
-                        if "dwg" in line.lower() or "drawing" in line.lower() or "DRG.No." in line.lower() or "no." in line.lower():
-                            detected_no = line.replace(":", "_").replace("/", "-")
-                            break
                     
-                    if len(detected_no) > 50:
+                    # Regex pattern to catch standard AM/NS drawing numbers 
+                    # Example format matched: H019-MND-IPPR-GEN-S-DFD-034 or similar alphanumeric blocks with dashes
+                    amns_pattern = r"([A-Z0-9]{3,5}-[A-Z0-9]{3,5}-[A-Z0-9]{3,6}-[A-Z0-9]{2,4}-[A-Z]-[A-Z]{2,4}-\d{3,4})"
+                    
+                    match = re.search(amns_pattern, text)
+                    if match:
+                        detected_no = match.group(1)
+                    else:
+                        # Fallback heuristic: search lines containing DRG or DWG
+                        lines = [line.strip() for line in text.splitlines() if line.strip()]
+                        for line in lines:
+                            if "drg" in line.lower() or "dwg" in line.lower():
+                                clean_line = line.replace("AMNS DRG.No.", "").replace(":", "_").strip()
+                                if len(clean_line) > 5:
+                                    detected_no = clean_line
+                                    break
+
+                    if len(detected_no) > 60:
                         detected_no = f"Drawing_{idx+1}"
 
                     page_data.append({
@@ -219,7 +231,7 @@ else:
                 df_drawings = pd.DataFrame(page_data)
 
                 st.markdown("### 📋 Review & Customize Drawing Filenames")
-                st.write("You can edit the drawing numbers in the table below before generating the final files:")
+                st.write("You can review or edit the detected AM/NS drawing numbers below before splitting:")
                 
                 edited_df = st.data_editor(
                     df_drawings,
@@ -240,6 +252,7 @@ else:
                             page_num = int(row["Page Number"])
                             custom_name = str(row["Auto-Detected Drawing Number / Name"]).strip()
                             
+                            # Clean characters to create a valid filename
                             safe_filename = "".join(c for c in custom_name if c.isalnum() or c in (' ', '.', '_', '-')).strip()
                             if not safe_filename:
                                 safe_filename = f"Drawing_Page_{page_num}"
@@ -256,18 +269,17 @@ else:
                             zf.writestr(filename, page_buffer.read())
 
                     zip_output.seek(0)
-                    st.success("All drawings successfully split and renamed!")
+                    st.success("All drawings successfully split and renamed using AM/NS numbers!")
                     st.download_button(
                         label="📥 Download Separated Drawings (ZIP)",
                         data=zip_output,
-                        file_name="separated_drawings.zip",
+                        file_name="amns_separated_drawings.zip",
                         mime="application/zip",
                         use_container_width=True
                     )
 
             except Exception as e:
-                st.error(f"Error processing PDF binder: {e}")
-    # --- EXCEL PART SPLITTER PAGE ---
+                st.error(f"Error processing PDF binder: {e}")    # --- EXCEL PART SPLITTER PAGE ---
     elif selected_page == "Excel Part Splitter":
         st.markdown("<h2>Excel Part Splitter Automation</h2>", unsafe_allow_html=True)
         st.write(
