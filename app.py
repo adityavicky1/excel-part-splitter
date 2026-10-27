@@ -198,7 +198,7 @@ else:
                     default_name = f"Drawing_Page_{idx+1}"
                     detected_no = default_name
                     for line in lines:
-                        if "dwg" in line.lower() or "drawing" in line.lower() or "no." in line.lower():
+                        if "dwg" in line.lower() or "drawing" in line.lower() or "DRG.No." in line.lower() or "no." in line.lower():
                             detected_no = line.replace(":", "_").replace("/", "-")
                             break
                     
