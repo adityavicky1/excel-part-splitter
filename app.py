@@ -7,7 +7,7 @@ from pypdf import PdfReader, PdfWriter
 import streamlit as st
 
 st.set_page_config(
-    page_title="BHARAT Industrial Supplies & Services",
+    page_title="FABTECH Industrial Supplies & Services",
     page_icon="⚙️",
     layout="wide",
 )
@@ -69,7 +69,7 @@ if not st.session_state.logged_in:
     st.markdown(
         """
             <div style="text-align: center; margin-top: 20px;">
-                <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">BHARAT<br><span style="font-size: 18px;">INDUSTRIAL SUPPLIES & SERVICES</span></h1>
+                <h1 style="color: #e62117; font-family: sans-serif; font-weight: 900; letter-spacing: 2px;">FABTECH<br><span style="font-size: 18px;">INDUSTRIAL SUPPLIES & SERVICES</span></h1>
             </div>
         """,
         unsafe_allow_html=True,
