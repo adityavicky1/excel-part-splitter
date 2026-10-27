@@ -176,161 +176,72 @@ else:
                 except Exception as e:
                     st.error(f"Error merging files: {e}")
 
-    # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
+   # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
     elif selected_page == "PDF Drawing Splitter & Renamer":
-        st.markdown(
-            "<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True
-        )
+        st.markdown("<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True)
         st.write(
-            "Upload a multi-page drawing binder PDF. The app will extract each page, "
-            "auto-detect the drawing numbers and sheet descriptions from the title blocks, "
-            "and let you review/customize before exporting as a ZIP package."
+            "Upload a multi-page drawing binder PDF. The app will extract each page title efficiently "
+            "and package them into a download ZIP."
         )
 
         drawing_pdf = st.file_uploader(
             "Upload Multi-Page Drawing Binder PDF",
             type=["pdf"],
-            key="drawing_splitter_uploader",
+            key="drawing_splitter_uploader"
         )
 
         if drawing_pdf is not None:
             try:
-                reader = PdfReader(drawing_pdf, strict=False)
+                # Read bytes once
+                pdf_bytes = drawing_pdf.read()
+                reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
                 num_pages = len(reader.pages)
-                st.success(
-                    f"Successfully loaded PDF binder with **{num_pages}** pages."
-                )
+                st.success(f"Successfully loaded PDF binder with **{num_pages}** pages.")
 
-                page_data = []
+                if st.button("📦 Split and Package Drawings into ZIP", type="primary"):
+                    with st.spinner("Processing pages and generating ZIP..."):
+                        zip_output = io.BytesIO()
+                        with zipfile.ZipFile(zip_output, "w", zipfile.ZIP_DEFLATED) as zf:
+                            import re
+                            for idx, page in enumerate(reader.pages):
+                                page_num = idx + 1
+                                try:
+                                    text = page.extract_text() or ""
+                                except Exception:
+                                    text = ""
 
-                for idx, page in enumerate(reader.pages):
-                    try:
-                        text = (
-                            page.extract_text(extraction_mode="layout")
-                            or page.extract_text()
-                            or ""
+                                # Fast regex check for drawing name
+                                amns_pattern = r"(H\d{3}-[A-Z0-9\-/\._]+)"
+                                matches = re.findall(amns_pattern, text)
+                                if matches:
+                                    detected_no = max(matches, key=len).strip(".-_/")
+                                else:
+                                    detected_no = f"Drawing_Page_{page_num}"
+
+                                if len(detected_no) > 60:
+                                    detected_no = f"Drawing_Page_{page_num}"
+
+                                safe_filename = "".join(c for c in detected_no if c.isalnum() or c in (' ', '.', '_', '-')).strip()
+                                filename = f"{safe_filename}.pdf"
+
+                                # Write single page directly to zip buffer to save RAM
+                                writer = PdfWriter()
+                                writer.add_page(page)
+                                page_buffer = io.BytesIO()
+                                writer.write(page_buffer)
+                                zf.writestr(filename, page_buffer.getvalue())
+                                
+                        zip_output.seek(0)
+                        st.success("All drawings successfully split and renamed!")
+                        st.download_button(
+                            label="📥 Download Separated Drawings (ZIP)",
+                            data=zip_output,
+                            file_name="amns_separated_drawings.zip",
+                            mime="application/zip",
+                            use_container_width=True
                         )
-                    except Exception:
-                        text = ""
-
-                    default_name = f"Drawing_Page_{idx+1}"
-                    detected_no = default_name
-
-                    # Flexible regex pattern to match drawing codes starting with H followed by digits and hyphens/letters
-                    amns_pattern = r"(H\d{3}-[A-Z0-9\-/\._]+)"
-                    matches = re.findall(amns_pattern, text)
-
-                    if matches:
-                        best_match = max(matches, key=len)
-                        detected_no = best_match.strip(".-_/")
-                    else:
-                        lines = [
-                            line.strip()
-                            for line in text.splitlines()
-                            if line.strip()
-                        ]
-                        for line in lines:
-                            if (
-                                "drg" in line.lower()
-                                or "dwg" in line.lower()
-                                or "no." in line.lower()
-                            ):
-                                clean_line = (
-                                    line.replace("AMNS", "")
-                                    .replace("DRG.No.", "")
-                                    .replace(":", "_")
-                                    .strip()
-                                )
-                                clean_line = re.sub(
-                                    r"[^a-zA-Z0-9\-_/. ]", "", clean_line
-                                )
-                                if len(clean_line) > 5:
-                                    detected_no = clean_line
-                                    break
-
-                    if len(detected_no) > 60:
-                        detected_no = f"Drawing_{idx+1}"
-
-                    page_data.append(
-                        {
-                            "Page Number": idx + 1,
-                            "Auto-Detected Drawing Number / Name": detected_no,
-                            "Text Preview": text[:100].replace("\n", " "),
-                        }
-                    )
-
-                df_drawings = pd.DataFrame(page_data)
-
-                st.markdown(
-                    "### 📋 Review & Customize Drawing Filenames"
-                )
-                st.write(
-                    "You can review or edit the detected drawing numbers in the table below before splitting:"
-                )
-
-                edited_df = st.data_editor(
-                    df_drawings,
-                    column_config={
-                        "Page Number": st.column_config.NumberColumn(
-                            disabled=True
-                        ),
-                        "Text Preview": st.column_config.TextColumn(
-                            disabled=True
-                        ),
-                    },
-                    hide_index=True,
-                    use_container_width=True,
-                )
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                if st.button(
-                    "📦 Split and Package Drawings into ZIP", type="primary"
-                ):
-                    zip_output = io.BytesIO()
-                    with zipfile.ZipFile(
-                        zip_output, "w", zipfile.ZIP_DEFLATED
-                    ) as zf:
-                        for index, row in edited_df.iterrows():
-                            page_num = int(row["Page Number"])
-                            custom_name = str(
-                                row["Auto-Detected Drawing Number / Name"]
-                            ).strip()
-
-                            safe_filename = "".join(
-                                c
-                                for c in custom_name
-                                if c.isalnum() or c in (" ", ".", "_", "-")
-                            ).strip()
-                            if not safe_filename:
-                                safe_filename = f"Drawing_Page_{page_num}"
-
-                            filename = f"{safe_filename}.pdf"
-
-                            writer = PdfWriter()
-                            writer.add_page(reader.pages[page_num - 1])
-
-                            page_buffer = io.BytesIO()
-                            writer.write(page_buffer)
-                            page_buffer.seek(0)
-
-                            zf.writestr(filename, page_buffer.read())
-
-                    zip_output.seek(0)
-                    st.success(
-                        "All drawings successfully split and renamed!"
-                    )
-                    st.download_button(
-                        label="📥 Download Separated Drawings (ZIP)",
-                        data=zip_output,
-                        file_name="amns_separated_drawings.zip",
-                        mime="application/zip",
-                        use_container_width=True,
-                    )
-
             except Exception as e:
                 st.error(f"Error processing PDF binder: {e}")
-
     # --- EXCEL SHEET COMBINER PAGE ---
     elif selected_page == "Excel Sheet Combiner":
         st.markdown("<h2>Excel Sheet Combiner</h2>", unsafe_allow_html=True)
