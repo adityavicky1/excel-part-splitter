@@ -169,7 +169,7 @@ else:
                 except Exception as e:
                     st.error(f"Error merging files: {e}")
 
-    # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
+   # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
     elif selected_page == "PDF Drawing Splitter & Renamer":
         st.markdown("<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True)
         st.write(
@@ -186,13 +186,18 @@ else:
 
         if drawing_pdf is not None:
             try:
-                reader = PdfReader(drawing_pdf)
+                # Use strict = False to help bypass overly rigid structural warnings in CAD PDFs
+                reader = PdfReader(drawing_pdf, strict=False)
                 num_pages = len(reader.pages)
                 st.success(f"Successfully loaded PDF binder with **{num_pages}** pages.")
 
                 page_data = []
                 for idx, page in enumerate(reader.pages):
-                    text = page.extract_text() or ""
+                    try:
+                        text = page.extract_text() or ""
+                    except Exception:
+                        text = ""  # Fallback if an individual stream hits token limits
+                        
                     lines = [line.strip() for line in text.splitlines() if line.strip()]
                     
                     default_name = f"Drawing_Page_{idx+1}"
@@ -262,7 +267,6 @@ else:
 
             except Exception as e:
                 st.error(f"Error processing PDF binder: {e}")
-
     # --- EXCEL PART SPLITTER PAGE ---
     elif selected_page == "Excel Part Splitter":
         st.markdown("<h2>Excel Part Splitter Automation</h2>", unsafe_allow_html=True)
