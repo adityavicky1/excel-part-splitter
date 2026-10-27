@@ -195,26 +195,30 @@ else:
                 
                 for idx, page in enumerate(reader.pages):
                     try:
-                        text = page.extract_text() or ""
+                        # Try layout-aware extraction first, fallback to standard
+                        text = page.extract_text(extraction_mode="layout") or page.extract_text() or ""
                     except Exception:
                         text = ""
                     
                     default_name = f"Drawing_Page_{idx+1}"
                     detected_no = default_name
                     
-                    # Regex pattern to catch standard AM/NS drawing numbers 
-                    # Example format matched: H019-MND-IPPR-GEN-S-DFD-034 or similar alphanumeric blocks with dashes
-                    amns_pattern = r"([A-Z0-9]{3,5}-[A-Z0-9]{3,5}-[A-Z0-9]{3,6}-[A-Z0-9]{2,4}-[A-Z]-[A-Z]{2,4}-\d{3,4})"
+                    # Flexible regex pattern to match AMNS drawing codes starting with H followed by digits and hyphens
+                    amns_pattern = r"(H\d{3}-[A-Z0-9\-/\._]+)"
                     
-                    match = re.search(amns_pattern, text)
-                    if match:
-                        detected_no = match.group(1)
+                    matches = re.findall(amns_pattern, text)
+                    if matches:
+                        # Pick the longest match as it's typically the full drawing number string
+                        best_match = max(matches, key=len)
+                        # Clean up any trailing punctuation or unwanted characters
+                        detected_no = best_match.strip(".-_/")
                     else:
-                        # Fallback heuristic: search lines containing DRG or DWG
+                        # Fallback: look for lines containing DRG or DWG keywords
                         lines = [line.strip() for line in text.splitlines() if line.strip()]
                         for line in lines:
-                            if "drg" in line.lower() or "dwg" in line.lower():
-                                clean_line = line.replace("AMNS DRG.No.", "").replace(":", "_").strip()
+                            if "drg" in line.lower() or "dwg" in line.lower() or "no." in line.lower():
+                                clean_line = line.replace("AMNS", "").replace("DRG.No.", "").replace(":", "_").strip()
+                                clean_line = re.sub(r'[^a-zA-Z0-9\-_/. ]', '', clean_line)
                                 if len(clean_line) > 5:
                                     detected_no = clean_line
                                     break
@@ -231,7 +235,7 @@ else:
                 df_drawings = pd.DataFrame(page_data)
 
                 st.markdown("### 📋 Review & Customize Drawing Filenames")
-                st.write("You can review or edit the detected AM/NS drawing numbers below before splitting:")
+                st.write("You can review or edit the detected AM/NS drawing numbers in the table below before splitting:")
                 
                 edited_df = st.data_editor(
                     df_drawings,
@@ -252,7 +256,6 @@ else:
                             page_num = int(row["Page Number"])
                             custom_name = str(row["Auto-Detected Drawing Number / Name"]).strip()
                             
-                            # Clean characters to create a valid filename
                             safe_filename = "".join(c for c in custom_name if c.isalnum() or c in (' ', '.', '_', '-')).strip()
                             if not safe_filename:
                                 safe_filename = f"Drawing_Page_{page_num}"
@@ -269,7 +272,7 @@ else:
                             zf.writestr(filename, page_buffer.read())
 
                     zip_output.seek(0)
-                    st.success("All drawings successfully split and renamed using AM/NS numbers!")
+                    st.success("All drawings successfully split and renamed!")
                     st.download_button(
                         label="📥 Download Separated Drawings (ZIP)",
                         data=zip_output,
@@ -279,70 +282,7 @@ else:
                     )
 
             except Exception as e:
-                st.error(f"Error processing PDF binder: {e}")    # --- EXCEL PART SPLITTER PAGE ---
-    elif selected_page == "Excel Part Splitter":
-        st.markdown("<h2>Excel Part Splitter Automation</h2>", unsafe_allow_html=True)
-        st.write(
-            "Upload your spreadsheet containing **Mark no**, **Qty**, and **Wt**"
-            " columns. All additional columns are preserved automatically."
-        )
-
-        uploaded_file = st.file_uploader(
-            "Choose an Excel file", type=["xlsx", "xls"], key="part_splitter_uploader"
-        )
-
-        if uploaded_file is not None:
-            try:
-                df = pd.read_excel(uploaded_file)
-                col_mapping = {col.strip().lower(): col for col in df.columns}
-                required_cols = {"mark no", "qty", "wt"}
-
-                if not required_cols.issubset(col_mapping.keys()):
-                    st.error("Invalid columns! Your file must at least contain 'Mark no', 'Qty', and 'Wt'.")
-                else:
-                    mark_col = col_mapping["mark no"]
-                    qty_col = col_mapping["qty"]
-                    wt_col = col_mapping["wt"]
-
-                    output_rows = []
-                    for _, row in df.iterrows():
-                        mark_no = row[mark_col]
-                        total_qty = int(row[qty_col])
-                        total_wt = row[wt_col]
-                        part_wt = round(total_wt / total_qty, 3) if total_qty > 0 else 0
-
-                        other_columns_data = {
-                            col: row[col] for col in df.columns if col not in [mark_col, qty_col, wt_col]
-                        }
-
-                        for i in range(1, total_qty + 1):
-                            new_row = {
-                                "Mark No": mark_no,
-                                "Part SlNo": f"{i}/{total_qty}",
-                                "Qty": 1,
-                                "Wt": part_wt,
-                            }
-                            new_row.update(other_columns_data)
-                            output_rows.append(new_row)
-
-                    output_df = pd.DataFrame(output_rows)
-                    st.success("File processed successfully with all columns preserved!")
-                    st.dataframe(output_df, use_container_width=True)
-
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                        output_df.to_excel(writer, index=False, sheet_name="Split_Parts")
-                    output.seek(0)
-
-                    st.download_button(
-                        label="📥 Download Processed Excel",
-                        data=output,
-                        file_name="processed_parts_output.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-            except Exception as e:
-                st.error(f"Error processing file: {e}")
-
+                st.error(f"Error processing PDF binder: {e}")
     # --- EXCEL SHEET COMBINER PAGE ---
     elif selected_page == "Excel Sheet Combiner":
         st.markdown("<h2>Excel Sheet Combiner</h2>", unsafe_allow_html=True)
