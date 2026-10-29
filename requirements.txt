@@ -6,3 +6,4 @@ Pillow>=9.0.0
 pypdf>=3.0.0
 easyocr>=1.7.0
 numpy>=1.20.0
+google-genai
