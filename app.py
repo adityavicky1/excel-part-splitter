@@ -176,9 +176,11 @@ else:
                 except Exception as e:
                     st.error(f"Error merging files: {e}")
 
-   # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
+    # --- PDF DRAWING SPLITTER & RENAMER PAGE ---
     elif selected_page == "PDF Drawing Splitter & Renamer":
-        st.markdown("<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True)
+        st.markdown(
+            "<h2>PDF Drawing Splitter & Renamer</h2>", unsafe_allow_html=True
+        )
         st.write(
             "Upload a multi-page drawing binder PDF. The app will extract each page title efficiently "
             "and package them into a download ZIP."
@@ -187,7 +189,7 @@ else:
         drawing_pdf = st.file_uploader(
             "Upload Multi-Page Drawing Binder PDF",
             type=["pdf"],
-            key="drawing_splitter_uploader"
+            key="drawing_splitter_uploader",
         )
 
         if drawing_pdf is not None:
@@ -196,12 +198,16 @@ else:
                 pdf_bytes = drawing_pdf.read()
                 reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
                 num_pages = len(reader.pages)
-                st.success(f"Successfully loaded PDF binder with **{num_pages}** pages.")
+                st.success(
+                    f"Successfully loaded PDF binder with **{num_pages}** pages."
+                )
 
                 if st.button("📦 Split and Package Drawings into ZIP", type="primary"):
                     with st.spinner("Processing pages and generating ZIP..."):
                         zip_output = io.BytesIO()
-                        with zipfile.ZipFile(zip_output, "w", zipfile.ZIP_DEFLATED) as zf:
+                        with zipfile.ZipFile(
+                            zip_output, "w", zipfile.ZIP_DEFLATED
+                        ) as zf:
                             import re
                             for idx, page in enumerate(reader.pages):
                                 page_num = idx + 1
@@ -214,14 +220,21 @@ else:
                                 amns_pattern = r"(H\d{3}-[A-Z0-9\-/\._]+)"
                                 matches = re.findall(amns_pattern, text)
                                 if matches:
-                                    detected_no = max(matches, key=len).strip(".-_/")
+                                    detected_no = max(
+                                        matches, key=len
+                                    ).strip(".-_/")
                                 else:
                                     detected_no = f"Drawing_Page_{page_num}"
 
                                 if len(detected_no) > 60:
                                     detected_no = f"Drawing_Page_{page_num}"
 
-                                safe_filename = "".join(c for c in detected_no if c.isalnum() or c in (' ', '.', '_', '-')).strip()
+                                safe_filename = "".join(
+                                    c
+                                    for c in detected_no
+                                    if c.isalnum()
+                                    or c in (" ", ".", "_", "-")
+                                ).strip()
                                 filename = f"{safe_filename}.pdf"
 
                                 # Write single page directly to zip buffer to save RAM
@@ -230,7 +243,7 @@ else:
                                 page_buffer = io.BytesIO()
                                 writer.write(page_buffer)
                                 zf.writestr(filename, page_buffer.getvalue())
-                                
+
                         zip_output.seek(0)
                         st.success("All drawings successfully split and renamed!")
                         st.download_button(
@@ -238,31 +251,37 @@ else:
                             data=zip_output,
                             file_name="amns_separated_drawings.zip",
                             mime="application/zip",
-                            use_container_width=True
+                            use_container_width=True,
                         )
             except Exception as e:
                 st.error(f"Error processing PDF binder: {e}")
 
-        # --- EXCEL PART SPLITTER PAGE ---
+    # --- EXCEL PART SPLITTER PAGE ---
     elif selected_page == "Excel Part Splitter":
-        st.markdown("<h2>Excel Part Splitter Automation</h2>", unsafe_allow_html=True)
+        st.markdown(
+            "<h2>Excel Part Splitter Automation</h2>", unsafe_allow_html=True
+        )
         st.write(
-            "Upload your spreadsheet containing **Mark no**, **Qty**, and **Wt**"
+            "Upload your spreadsheet containing **Mark no**, **Qty**, **Wt**, and **area**"
             " columns. All additional columns are preserved automatically."
         )
 
         uploaded_file = st.file_uploader(
-            "Choose an Excel file", type=["xlsx", "xls"], key="part_splitter_uploader"
+            "Choose an Excel file",
+            type=["xlsx", "xls"],
+            key="part_splitter_uploader",
         )
 
         if uploaded_file is not None:
             try:
                 df = pd.read_excel(uploaded_file)
                 col_mapping = {col.strip().lower(): col for col in df.columns}
-                required_cols = {"mark no", "qty", "wt",”area”}
+                required_cols = {"mark no", "qty", "wt", "area"}
 
                 if not required_cols.issubset(col_mapping.keys()):
-                    st.error("Invalid columns! Your file must at least contain 'Mark no', 'Qty', and 'Wt'.")
+                    st.error(
+                        "Invalid columns! Your file must at least contain 'Mark no', 'Qty', 'Wt', and 'area'."
+                    )
                 else:
                     mark_col = col_mapping["mark no"]
                     qty_col = col_mapping["qty"]
@@ -275,12 +294,21 @@ else:
                         total_qty = int(row[qty_col])
                         total_wt = row[wt_col]
                         total_area = row[area_col]
-                        part_wt = round(total_wt / total_qty, 3) if total_qty > 0 else 0
-                        part_area = round(total_area / total_qty, 3) if total_qty > 0 else 0
-
+                        part_wt = (
+                            round(total_wt / total_qty, 3)
+                            if total_qty > 0
+                            else 0
+                        )
+                        part_area = (
+                            round(total_area / total_qty, 3)
+                            if total_qty > 0
+                            else 0
+                        )
 
                         other_columns_data = {
-                            col: row[col] for col in df.columns if col not in [mark_col, qty_col, wt_col, area_col]
+                            col: row[col]
+                            for col in df.columns
+                            if col not in [mark_col, qty_col, wt_col, area_col]
                         }
 
                         for i in range(1, total_qty + 1):
@@ -290,18 +318,21 @@ else:
                                 "Qty": 1,
                                 "Wt": part_wt,
                                 "area": part_area,
-
                             }
                             new_row.update(other_columns_data)
                             output_rows.append(new_row)
 
                     output_df = pd.DataFrame(output_rows)
-                    st.success("File processed successfully with all columns preserved!")
+                    st.success(
+                        "File processed successfully with all columns preserved!"
+                    )
                     st.dataframe(output_df, use_container_width=True)
 
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                        output_df.to_excel(writer, index=False, sheet_name="Split_Parts")
+                        output_df.to_excel(
+                            writer, index=False, sheet_name="Split_Parts"
+                        )
                     output.seek(0)
 
                     st.download_button(
@@ -313,7 +344,6 @@ else:
             except Exception as e:
                 st.error(f"Error processing file: {e}")
 
-    
     # --- EXCEL SHEET COMBINER PAGE ---
     elif selected_page == "Excel Sheet Combiner":
         st.markdown("<h2>Excel Sheet Combiner</h2>", unsafe_allow_html=True)
