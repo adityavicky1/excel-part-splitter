@@ -26,9 +26,9 @@ def check_hash(password, hashed_text):
 # Initialize Database of Users in Session State
 if "users_db" not in st.session_state:
     st.session_state.users_db = {
-        "admin": make_hash("steel2026"),
+        "admin": make_hash("steel2030"),
         "avikram": make_hash("vicky123"),
-        "manager": make_hash("plant2026"),
+        "manager": make_hash("plant2030"),
     }
 
 if "logged_in" not in st.session_state:
