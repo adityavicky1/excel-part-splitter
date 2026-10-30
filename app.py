@@ -29,6 +29,7 @@ if "users_db" not in st.session_state:
         "admin": make_hash("steel2030"),
         "avikram": make_hash("vicky123"),
         "manager": make_hash("plant2030"),
+         "ductofab": make_hash("plant2026"),
     }
 
 if "logged_in" not in st.session_state:
