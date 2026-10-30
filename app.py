@@ -405,4 +405,434 @@ else:
             "<h2>NC File Sorter & Extractor</h2>", unsafe_allow_html=True
         )
         st.write(
-            "Upload
+            "Upload your `.nc` or `.nc1` files to parse parameters (Grade & Section)"
+            " and organize them automatically into folders based on **MM Section** and **Grade**."
+        )
+
+        st.markdown("### ⚙️ Parsing Configuration")
+        col_cfg1, col_cfg2 = st.columns(2)
+        with col_cfg1:
+            grade_line_idx = (
+                st.number_input(
+                    "Grade Line Number (1-based index)",
+                    min_value=1,
+                    value=5,
+                    step=1,
+                    help="Specify which line number in the cleaned file contains the Grade.",
+                )
+                - 1
+            )
+        with col_cfg2:
+            section_line_idx = (
+                st.number_input(
+                    "MM Section Line Number (1-based index)",
+                    min_value=1,
+                    value=7,
+                    step=1,
+                    help="Specify which line number in the cleaned file contains the MM Section.",
+                )
+                - 1
+            )
+
+        nc_files = st.file_uploader(
+            "Select NC Files",
+            type=["nc", "nc1"],
+            accept_multiple_files=True,
+            key="nc_uploader",
+        )
+
+        if nc_files:
+            st.info(f"{len(nc_files)} NC file(s) uploaded successfully.")
+            parsed_data = []
+            file_contents_map = {}
+
+            for file in nc_files:
+                try:
+                    file.seek(0)
+                    content_bytes = file.read()
+                    file_contents_map[file.name] = content_bytes
+                    lines = (
+                        content_bytes.decode("utf-8", errors="ignore")
+                        .splitlines()
+                    )
+                    cleaned_lines = [
+                        line.strip() for line in lines if line.strip()
+                    ]
+
+                    grade = "Unknown Grade"
+                    section = "Unknown Section"
+                    meaningful_lines = [
+                        l
+                        for l in cleaned_lines
+                        if l not in ["ST", "AK", "BO", "EN"]
+                    ]
+
+                    if len(meaningful_lines) > max(
+                        grade_line_idx, section_line_idx
+                    ):
+                        grade = meaningful_lines[grade_line_idx]
+                        section = meaningful_lines[section_line_idx]
+                    elif len(cleaned_lines) > max(
+                        grade_line_idx, section_line_idx
+                    ):
+                        grade = cleaned_lines[grade_line_idx]
+                        section = cleaned_lines[section_line_idx]
+
+                    parsed_data.append(
+                        {
+                            "NC name": file.name,
+                            "MM Section": section,
+                            "Grade": grade,
+                        }
+                    )
+                except Exception as e:
+                    parsed_data.append(
+                        {
+                            "NC name": file.name,
+                            "MM Section": "Error",
+                            "Grade": str(e),
+                        }
+                    )
+
+            df_nc = pd.DataFrame(parsed_data)
+            st.markdown("### Extracted Attributes Preview")
+            st.dataframe(df_nc, use_container_width=True)
+
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(
+                zip_buffer, "w", zipfile.ZIP_DEFLATED
+            ) as zip_file:
+                for item in parsed_data:
+                    filename = item["NC name"]
+                    sec = item["MM Section"]
+                    grd = item["Grade"]
+                    folder_name = f"{sec}_{grd}"
+                    file_path_in_zip = f"{folder_name}/{filename}"
+                    if filename in file_contents_map:
+                        zip_file.writestr(
+                            file_path_in_zip, file_contents_map[filename]
+                        )
+
+            zip_buffer.seek(0)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                    df_nc.to_excel(
+                        writer, index=False, sheet_name="NC_Summary"
+                    )
+                excel_buffer.seek(0)
+
+                st.download_button(
+                    label="📥 Download Summary Excel",
+                    data=excel_buffer,
+                    file_name="nc_files_summary.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+
+            with col2:
+                st.download_button(
+                    label="📦 Download Sorted Folders (ZIP)",
+                    data=zip_buffer,
+                    file_name="sorted_nc_folders.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                )
+
+    # --- SMART FILE FINDER & EXTRACTOR PAGE ---
+    elif selected_page == "Smart File Finder & Extractor":
+        st.markdown(
+            "<h2>Smart File Finder & Extractor</h2>", unsafe_allow_html=True
+        )
+        st.write(
+            "Upload your criteria Excel sheet containing the required file names/numbers, "
+            "then upload your source files below to automatically filter and extract them into a ZIP."
+        )
+
+        criteria_file = st.file_uploader(
+            "1. Upload Excel File containing Required File List",
+            type=["xlsx", "xls", "csv"],
+            key="criteria_uploader",
+        )
+
+        selected_column = None
+        target_search_values = []
+
+        if criteria_file is not None:
+            try:
+                if criteria_file.name.endswith(".csv"):
+                    criteria_df = pd.read_csv(criteria_file)
+                else:
+                    criteria_df = pd.read_excel(criteria_file)
+
+                st.success("Criteria spreadsheet loaded successfully!")
+                st.dataframe(criteria_df.head(), use_container_width=True)
+
+                col_options = criteria_df.columns.tolist()
+                selected_column = st.selectbox(
+                    "Select Column containing File Numbers/Names to extract:",
+                    col_options,
+                )
+
+                if selected_column:
+                    target_search_values = (
+                        criteria_df[selected_column]
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
+                        .tolist()
+                    )
+                    st.info(
+                        f"Loaded **{len(target_search_values)}** target file identifier(s) from the spreadsheet."
+                    )
+            except Exception as e:
+                st.error(f"Error reading criteria spreadsheet: {e}")
+
+        st.markdown("---")
+
+        source_files = st.file_uploader(
+            "2. Upload Source Files (Select all files from your folder to match against)",
+            accept_multiple_files=True,
+            key="source_files_uploader",
+        )
+
+        if source_files and target_search_values:
+            try:
+                found_files_map = {}
+
+                for file in source_files:
+                    base_name, _ = os.path.splitext(file.name)
+                    for target in target_search_values:
+                        if (
+                            target.lower() == base_name.lower()
+                            or target.lower() in file.name.lower()
+                        ):
+                            found_files_map[target] = file
+
+                st.markdown("### Matching Results Summary")
+                st.write(
+                    f"Matched **{len(found_files_map)}** out of **{len(target_search_values)}** requested files."
+                )
+
+                if found_files_map:
+                    matched_df = pd.DataFrame(
+                        [
+                            {
+                                "Requested Identifier": k,
+                                "Matched Filename": v.name,
+                            }
+                            for k, v in found_files_map.items()
+                        ]
+                    )
+                    st.dataframe(matched_df, use_container_width=True)
+
+                    if st.button(
+                        "📦 Package Matched Files into ZIP", type="primary"
+                    ):
+                        extracted_zip_buffer = io.BytesIO()
+                        with zipfile.ZipFile(
+                            extracted_zip_buffer, "w", zipfile.ZIP_DEFLATED
+                        ) as zf:
+                            for tgt, fobj in found_files_map.items():
+                                fobj.seek(0)
+                                zf.writestr(fobj.name, fobj.read())
+                        extracted_zip_buffer.seek(0)
+
+                        st.success(
+                            "Requested documents packaged successfully!"
+                        )
+                        st.download_button(
+                            label="📥 Download Extracted Files (ZIP)",
+                            data=extracted_zip_buffer,
+                            file_name="matched_extracted_files.zip",
+                            mime="application/zip",
+                            use_container_width=True,
+                        )
+                else:
+                    st.warning(
+                        "No matching files found among the uploaded source files for the identifiers provided in your Excel sheet."
+                    )
+            except Exception as e:
+                st.error(f"Error processing files: {e}")
+        elif not criteria_file:
+            st.info("Please upload your criteria Excel sheet to get started.")
+        elif not source_files:
+            st.info("Please upload the source files to match against.")
+
+    # --- AUTOMATED DPR SYNTHESIZER PAGE ---
+    elif selected_page == "Automated DPR Synthesizer":
+        st.markdown(
+            "<h2>Automated DPR Synthesizer</h2>", unsafe_allow_html=True
+        )
+        st.write(
+            "Consolidate daily production reports (DPR), track fabrication milestones, "
+            "and generate automated executive status summaries."
+        )
+
+        dpr_file = st.file_uploader(
+            "Upload Daily Production Report (Excel / CSV)",
+            type=["xlsx", "xls", "csv"],
+            key="dpr_uploader",
+        )
+
+        if dpr_file is not None:
+            try:
+                if dpr_file.name.endswith(".csv"):
+                    dpr_df = pd.read_csv(dpr_file)
+                else:
+                    dpr_df = pd.read_excel(dpr_file)
+
+                st.success("DPR file uploaded successfully!")
+                st.dataframe(dpr_df, use_container_width=True)
+
+                col_m1, col_m2, col_m3 = st.columns(3)
+                with col_m1:
+                    st.metric(label="Total Records", value=len(dpr_df))
+                with col_m2:
+                    if (
+                        "Weight" in dpr_df.columns
+                        or "Wt" in dpr_df.columns
+                    ):
+                        wt_col_name = (
+                            "Weight" if "Weight" in dpr_df.columns else "Wt"
+                        )
+                        total_weight_sum = dpr_df[wt_col_name].sum()
+                        st.metric(
+                            label="Total Tonnage / Weight",
+                            value=f"{total_weight_sum:,.2f}",
+                        )
+                    else:
+                        st.metric(
+                            label="Columns Detected", value=len(dpr_df.columns)
+                        )
+                with col_m3:
+                    st.metric(label="Status", value="Ready for Export")
+
+                output_dpr = io.BytesIO()
+                with pd.ExcelWriter(output_dpr, engine="openpyxl") as writer:
+                    dpr_df.to_excel(
+                        writer, index=False, sheet_name="DPR_Synthesis"
+                    )
+                output_dpr.seek(0)
+
+                st.download_button(
+                    label="📥 Download Synthesized DPR Report",
+                    data=output_dpr,
+                    file_name="synthesized_dpr_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"Error processing DPR file: {e}")
+
+    # --- LOAN EMI & INTEREST ANALYZER PAGE ---
+    elif selected_page == "Loan EMI & Interest Analyzer":
+        st.markdown("<h2>🏠 Advanced Loan EMI & Interest Analyzer</h2>", unsafe_allow_html=True)
+        st.write("Use the interactive sliders below to adjust your loan details and see real-time payment metrics and visual amortization charts.")
+
+        # --- INPUT SECTION USING SLIDERS ---
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            loan_amount = st.slider(
+                "Loan Amount (₹)",
+                min_value=100000,
+                max_value=20000000,
+                value=5000000,
+                step=50000,
+                format="%,d"
+            )
+
+        with col2:
+            interest_rate = st.slider(
+                "Interest Rate (% p.a.)",
+                min_value=1.0,
+                max_value=20.0,
+                value=8.5,
+                step=0.1,
+                format="%.1f%%"
+            )
+
+        with col3:
+            tenure_years = st.slider(
+                "Loan Tenure (Years)",
+                min_value=1,
+                max_value=30,
+                value=20,
+                step=1
+            )
+
+        # --- CALCULATIONS ---
+        monthly_interest_rate = (interest_rate / 100) / 12
+        total_months = tenure_years * 12
+
+        if monthly_interest_rate > 0:
+            emi = (loan_amount * monthly_interest_rate * (1 + monthly_interest_rate) ** total_months) / \
+                  ((1 + monthly_interest_rate) ** total_months - 1)
+        else:
+            emi = loan_amount / total_months
+
+        total_payment = emi * total_months
+        total_interest = total_payment - loan_amount
+
+        # --- METRIC CARDS ---
+        st.markdown("---")
+        mcol1, mcol2, mcol3 = st.columns(3)
+        with mcol1:
+            st.metric(label="💳 Monthly EMI", value=f"₹ {emi:,.2f}")
+        with mcol2:
+            st.metric(label="📊 Total Interest Payable", value=f"₹ {total_interest:,.2f}")
+        with mcol3:
+            st.metric(label="💰 Total Payment (Principal + Interest)", value=f"₹ {total_payment:,.2f}")
+
+        # --- YEAR-BY-YEAR AMORTIZATION & GRAPH DATA ---
+        st.markdown("---")
+        st.markdown("### 📈 Cumulative Interest & Principal Paid Over Years")
+
+        schedule_data = []
+        remaining_balance = loan_amount
+        cumulative_interest = 0.0
+        cumulative_principal = 0.0
+
+        for year in range(1, tenure_years + 1):
+            yearly_interest = 0
+            yearly_principal = 0
+            
+            for month in range(1, 13):
+                interest_payment = remaining_balance * monthly_interest_rate
+                principal_payment = emi - interest_payment
+                remaining_balance -= principal_payment
+                
+                yearly_interest += interest_payment
+                yearly_principal += principal_payment
+
+            cumulative_interest += yearly_interest
+            cumulative_principal += yearly_principal
+            
+            schedule_data.append({
+                "Year": f"Year {year}",
+                "Principal Paid": cumulative_principal,
+                "Interest Paid": cumulative_interest,
+                "Remaining Balance": max(0.0, remaining_balance)
+            })
+
+        df_schedule = pd.DataFrame(schedule_data)
+
+        # --- DISPLAY CHART ---
+        chart_data = df_schedule.set_index("Year")[["Principal Paid", "Interest Paid"]]
+        st.bar_chart(chart_data)
+
+        # Optional table view expander
+        with st.expander("🔍 View Detailed Year-by-Year Breakdown Table"):
+            st.dataframe(df_schedule.style.format({
+                "Principal Paid": "₹ {:,.2f}",
+                "Interest Paid": "₹ {:,.2f}",
+                "Remaining Balance": "₹ {:,.2f}"
+            }), use_container_width=True)
+
+    # --- UNDER CONSTRUCTION PAGE ---
+    elif selected_page == "Under Construction":
+        st.markdown("<h2>Under Construction</h2>", unsafe_allow_html=True)
+        st.info("New automation modules are currently being developed.")
