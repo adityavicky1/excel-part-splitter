@@ -30,6 +30,7 @@ if "users_db" not in st.session_state:
         "avikram": make_hash("vicky123"),
         "manager": make_hash("plant2030"),
         "ductofab": make_hash("plant2026"),
+        "neostructo": make_hash("plant2026"),
     }
 
 if "logged_in" not in st.session_state:
@@ -122,6 +123,7 @@ else:
             "Smart File Finder & Extractor",
             "Automated DPR Synthesizer",
             "Loan EMI & Interest Analyzer",
+            "Bolt BOM Estimator",
             "Under Construction",
         ],
         label_visibility="collapsed",
@@ -831,7 +833,106 @@ else:
                 "Interest Paid": "₹ {:,.2f}",
                 "Remaining Balance": "₹ {:,.2f}"
             }), use_container_width=True)
+# --- STRUCTURAL BOLT & HARDWARE BOM ESTIMATOR PAGE ---
+    elif selected_page == "Bolt BOM Estimator":
+        st.markdown("<h2>Structural Bolt & Hardware BOM Estimator</h2>", unsafe_allow_html=True)
+        st.write(
+            "Upload your raw fastener takeoff report (Excel/CSV) from Tekla or STAAD. "
+            "The tool will group hardware by diameter, length, and grade, add wastage contingencies, "
+            "and generate a vendor-ready procurement list."
+        )
 
+        # Configuration Settings in Sidebar or Columns
+        st.markdown("### ⚙️ Procurement Parameters")
+        col_cfg1, col_cfg2 = st.columns(2)
+        with col_cfg1:
+            wastage_pct = st.number_input(
+                "Wastage / Contingency Safety Buffer (%)",
+                min_value=0.0,
+                max_value=20.0,
+                value=5.0,
+                step=0.5,
+                help="Extra percentage added to total quantities to account for site loss or testing."
+            )
+        with col_cfg2:
+            project_ref = st.text_input("Project / Structure Reference Name", value="FABTECH-PRJ-01")
+
+        bolt_file = st.file_uploader(
+            "Upload Fastener Takeoff File (Excel / CSV)",
+            type=["xlsx", "xls", "csv"],
+            key="bolt_uploader"
+        )
+
+        if bolt_file is not None:
+            try:
+                if bolt_file.name.endswith(".csv"):
+                    df_bolts = pd.read_csv(bolt_file)
+                else:
+                    df_bolts = pd.read_excel(bolt_file)
+
+                st.success("Fastener takeoff file loaded successfully!")
+                st.markdown("### Raw Takeoff Preview")
+                st.dataframe(df_bolts.head(), use_container_width=True)
+
+                # Normalize column names for flexible matching
+                col_mapping = {col.strip().lower(): col for col in df_bolts.columns}
+                
+                # Check for standard expected columns or provide mapping selectors
+                st.markdown("### 🗺️ Column Mapping Configuration")
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                
+                with col_m1:
+                    default_dia = next((col_mapping[c] for c in ["dia", "diameter", "size"] if c in col_mapping), df_bolts.columns[0])
+                    dia_col = st.selectbox("Diameter Column", df_bolts.columns, index=df_bolts.columns.get_loc(default_dia))
+                with col_m2:
+                    default_len = next((col_mapping[c] for c in ["length", "len", "bolt_len"] if c in col_mapping), df_bolts.columns[1] if len(df_bolts.columns) > 1 else df_bolts.columns[0])
+                    len_col = st.selectbox("Length Column", df_bolts.columns, index=df_bolts.columns.get_loc(default_len))
+                with col_m3:
+                    default_grade = next((col_mapping[c] for c in ["grade", "material", "bolt_grade"] if c in col_mapping), df_bolts.columns[2] if len(df_bolts.columns) > 2 else df_bolts.columns[0])
+                    grade_col = st.selectbox("Grade Column (e.g. 8.8, 10.9)", df_bolts.columns, index=df_bolts.columns.get_loc(default_grade))
+                with col_m4:
+                    default_qty = next((col_mapping[c] for c in ["qty", "quantity", "nos", "count"] if c in col_mapping), df_bolts.columns[3] if len(df_bolts.columns) > 3 else df_bolts.columns[0])
+                    qty_col = st.selectbox("Quantity Column", df_bolts.columns, index=df_bolts.columns.get_loc(default_qty))
+
+                if st.button("🚀 Process & Generate Vendor Purchase List", type="primary"):
+                    # Group and aggregate quantities
+                    grouped_df = df_bolts.groupby([dia_col, len_col, grade_col], as_index=False)[qty_col].sum()
+                    
+                    # Apply contingency safety buffer
+                    multiplier = 1 + (wastage_pct / 100.0)
+                    grouped_df["Procurement Qty (With Wastage)"] = (grouped_df[qty_col] * multiplier).apply(lambda x: int(np.ceil(x)))
+                    
+                    # Estimate approximate weight if standard metadata isn't present (approximate calculation heuristic)
+                    # Let's clean up column headers for presentation
+                    grouped_df.columns = ["Diameter", "Length", "Grade", "Design Qty", f"Procurement Qty (+{wastage_pct}%)"]
+
+                    st.markdown("---")
+                    st.markdown(f"### 📦 Vendor-Ready Procurement BOM ({project_ref})")
+                    st.dataframe(grouped_df, use_container_width=True)
+
+                    # Summary Metrics
+                    total_items = grouped_df[f"Procurement Qty (+{wastage_pct}%)"].sum()
+                    col_stat1, col_stat2 = st.columns(2)
+                    with col_stat1:
+                        st.metric(label="Total Unique Hardware Configurations", value=len(grouped_df))
+                    with col_stat2:
+                        st.metric(label="Total Procurement Piece Count", value=f"{total_items:,}")
+
+                    # Export to Excel
+                    output_buffer = io.BytesIO()
+                    with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
+                        grouped_df.to_excel(writer, index=False, sheet_name="Bolt_Procurement_BOM")
+                    output_buffer.seek(0)
+
+                    st.download_button(
+                        label="📥 Download Vendor Purchase List (Excel)",
+                        data=output_buffer,
+                        file_name=f"{project_ref}_Bolt_BOM_Procurement.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+            except Exception as e:
+                st.error(f"Error parsing bolt takeoff file: {e}")
     # --- UNDER CONSTRUCTION PAGE ---
     elif selected_page == "Under Construction":
         st.markdown("<h2>Under Construction</h2>", unsafe_allow_html=True)
